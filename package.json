@@ -7,6 +7,7 @@
 		"dev": "vite dev",
 		"build": "wrangler types --check && vite build && bun run scripts/inject-exports.ts",
 		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
+		"deploy": "bun run build && wrangler deploy",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "wrangler types --check && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
