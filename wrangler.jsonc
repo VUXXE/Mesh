@@ -1,0 +1,27 @@
+{
+	"$schema": "./node_modules/wrangler/config-schema.json",
+	"name": "papan",
+	"compatibility_date": "2026-09-13",
+	"compatibility_flags": ["nodejs_als"],
+	"main": ".svelte-kit/cloudflare/_worker.js",
+	"assets": {
+		"binding": "ASSETS",
+		"directory": ".svelte-kit/cloudflare"
+	},
+	"durable_objects": {
+		"bindings": [
+			{
+				"name": "ROOMS",
+				"class_name": "WhiteboardRoom"
+			}
+		]
+	},
+	"migrations": [
+		{
+			"tag": "v1",
+			"new_sqlite_classes": ["WhiteboardRoom"]
+		}
+	],
+	"workers_dev": true,
+	"preview_urls": true
+}

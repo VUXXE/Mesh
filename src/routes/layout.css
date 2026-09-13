@@ -1,0 +1,19 @@
+@import 'tailwindcss';
+
+@layer base {
+	html,
+	body {
+		height: 100%;
+		width: 100%;
+		overflow: hidden;
+		background-color: #121214;
+		color: #f4f4f5;
+		font-family:
+			system-ui,
+			-apple-system,
+			BlinkMacSystemFont,
+			'Segoe UI',
+			Roboto,
+			sans-serif;
+	}
+}

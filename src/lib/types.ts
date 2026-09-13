@@ -1,0 +1,115 @@
+export type ShapeType = 'path' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note';
+
+export interface PathPoint {
+	x: number;
+	y: number;
+	pressure?: number;
+}
+
+export interface PathData {
+	points: PathPoint[];
+}
+
+export interface TextData {
+	text: string;
+	fontSize?: number;
+	fontFamily?: string;
+	align?: 'left' | 'center' | 'right';
+}
+
+export interface StickyNoteData {
+	text: string;
+	color?: string;
+}
+
+export interface ShapeRecord {
+	id: string;
+	type: ShapeType;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	fill: string;
+	stroke: string;
+	strokeWidth: number;
+	rotation: number;
+	zIndex: number;
+	data?: any;
+	createdBy: string;
+	updatedAt: number;
+}
+
+export interface PeerPresence {
+	userId: string;
+	name: string;
+	color: string;
+	cursor: { x: number; y: number } | null;
+	selectedIds: string[];
+}
+
+export type C2SMessage =
+	| {
+			type: 'presence:update';
+			userId: string;
+			name: string;
+			color: string;
+			cursor: { x: number; y: number } | null;
+			selectedIds: string[];
+	  }
+	| {
+			type: 'shape:upsert';
+			shapes: Array<{
+				id: string;
+				type: ShapeType;
+				x: number;
+				y: number;
+				width?: number;
+				height?: number;
+				fill?: string;
+				stroke?: string;
+				strokeWidth?: number;
+				rotation?: number;
+				zIndex?: number;
+				data?: any;
+				updatedAt: number;
+			}>;
+	  }
+	| {
+			type: 'shape:delete';
+			ids: string[];
+	  }
+	| {
+			type: 'canvas:clear';
+	  };
+
+export type S2CMessage =
+	| {
+			type: 'sync:init';
+			roomId: string;
+			serverTime: number;
+			shapes: ShapeRecord[];
+			peers: PeerPresence[];
+	  }
+	| {
+			type: 'presence:peer';
+			userId: string;
+			name: string;
+			color: string;
+			cursor: { x: number; y: number } | null;
+			selectedIds: string[];
+	  }
+	| {
+			type: 'shapes:upserted';
+			shapes: ShapeRecord[];
+	  }
+	| {
+			type: 'shapes:deleted';
+			ids: string[];
+	  }
+	| {
+			type: 'peer:left';
+			userId: string;
+	  }
+	| {
+			type: 'canvas:cleared';
+	  };
