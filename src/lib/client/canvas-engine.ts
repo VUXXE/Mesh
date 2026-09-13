@@ -48,6 +48,7 @@ export class CanvasEngine {
 		| 'draw'
 		| 'create_shape'
 		| 'create_line'
+		| 'create_text'
 		| 'drag_selection'
 		| 'marquee'
 		| 'pan'
@@ -146,6 +147,16 @@ export class CanvasEngine {
 		this.renderOverlay();
 	}
 
+	private toolChangedListeners: ((tool: ToolMode) => void)[] = [];
+
+	addToolChangedListener(fn: (tool: ToolMode) => void) {
+		this.toolChangedListeners.push(fn);
+	}
+
+	removeToolChangedListener(fn: (tool: ToolMode) => void) {
+		this.toolChangedListeners = this.toolChangedListeners.filter((l) => l !== fn);
+	}
+
 	setTool(tool: ToolMode) {
 		this.tool = tool;
 		if (tool !== 'select') {
@@ -154,6 +165,9 @@ export class CanvasEngine {
 		}
 		this.renderOverlay();
 		this.onToolChanged?.(tool);
+		for (const fn of this.toolChangedListeners) {
+			fn(tool);
+		}
 	}
 
 	setStrokeColor(color: string) {
@@ -316,9 +330,8 @@ export class CanvasEngine {
 		}
 
 		if (this.tool === 'text') {
-			this.interactionType = null;
-			this.isInteracting = false;
-			this.createTextInput(worldPos);
+			this.interactionType = 'create_text';
+			this.renderOverlay();
 			return;
 		}
 
@@ -618,9 +631,10 @@ export class CanvasEngine {
 			if (shapeType === 'sticky_note') {
 				this.selectedIds = [shape.id];
 				this.onSelectionChanged?.(this.selectedIds);
-				this.setTool('select');
 				this.startTextEdit(shape);
 			}
+		} else if (this.interactionType === 'create_text') {
+			this.createTextInput(this.startPoint);
 		} else if (this.interactionType === 'drag_selection') {
 			const movedShapes: ShapeRecord[] = [];
 			const beforeShapes: ShapeRecord[] = [];
@@ -825,7 +839,6 @@ export class CanvasEngine {
 		this.onActionRecorded?.({ type: 'create', shape });
 		this.selectedIds = [shape.id];
 		this.onSelectionChanged?.(this.selectedIds);
-		this.setTool('select');
 		this.startTextEdit(shape);
 	}
 

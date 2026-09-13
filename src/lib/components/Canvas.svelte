@@ -29,6 +29,7 @@
 	let staticCanvas: HTMLCanvasElement;
 	let overlayCanvas: HTMLCanvasElement;
 	let viewport = $state<ViewportState>({ panX: 0, panY: 0, zoom: 1 });
+	let activeTool = $state<string>('select');
 
 	let editingShape = $state<ShapeRecord | null>(null);
 	let editText = $state('');
@@ -68,10 +69,28 @@
 		};
 	});
 
+	const canvasCursor = $derived.by(() => {
+		if (editingShape) return 'cursor-default';
+		switch (activeTool) {
+			case 'select':
+				return 'cursor-default';
+			case 'pan':
+				return 'cursor-grab active:cursor-grabbing';
+			case 'text':
+				return 'cursor-text';
+			case 'sticky_note':
+				return 'cursor-pointer';
+			default:
+				return 'cursor-crosshair';
+		}
+	});
+
 	$effect(() => {
 		if (editingShape && editTextarea) {
-			editTextarea.focus();
-			editTextarea.select();
+			requestAnimationFrame(() => {
+				editTextarea?.focus();
+				editTextarea?.select();
+			});
 		}
 	});
 
@@ -92,6 +111,9 @@
 		createdEngine.onEndTextEdit = () => {
 			editingShape = null;
 		};
+		createdEngine.addToolChangedListener((t) => {
+			activeTool = t;
+		});
 
 		engine = createdEngine;
 
@@ -142,6 +164,7 @@
 			}
 			editingShape = null;
 			engine.endTextEdit();
+			engine.setTool('select');
 			return;
 		}
 
@@ -180,6 +203,7 @@
 
 		editingShape = null;
 		engine.endTextEdit();
+		engine.setTool('select');
 	}
 
 	function handleTextareaKeyDown(e: KeyboardEvent) {
@@ -248,7 +272,7 @@
 		onpointercancel={handlePointerUp}
 		ondblclick={handleDblClick}
 		onwheel={handleWheel}
-		class="absolute inset-0 cursor-crosshair active:cursor-grabbing"
+		class="absolute inset-0 {canvasCursor}"
 	></canvas>
 
 	<!-- Inline Text Editing Overlay for Sticky Notes & Text Shapes -->
@@ -258,6 +282,9 @@
 			bind:value={editText}
 			onkeydown={handleTextareaKeyDown}
 			onblur={commitEdit}
+			onpointerdown={(e) => e.stopPropagation()}
+			onpointerup={(e) => e.stopPropagation()}
+			onclick={(e) => e.stopPropagation()}
 			placeholder={editBox.isSticky ? 'Type a note...' : 'Type text...'}
 			style="position: absolute; left: {editBox.x}px; top: {editBox.y}px; width: {Math.max(
 				editBox.width,
