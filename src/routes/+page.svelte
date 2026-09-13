@@ -74,10 +74,10 @@
 				<h1 class="text-xl font-bold tracking-tight text-[#f4f4f5]">Mesh</h1>
 				<p class="text-xs text-[#a1a1aa]">Real-time collaborative vector whiteboard</p>
 			</div>
-			</div>
+		</div>
 
-			<!-- GitHub repo badges -->
-			<div class="mb-6 flex flex-wrap items-center gap-1.5">
+		<!-- GitHub repo badges -->
+		<div class="mb-6 flex flex-wrap items-center gap-1.5">
 			<a
 				href="https://github.com/VUXXE/Mesh"
 				target="_blank"
@@ -131,7 +131,7 @@
 				alt="Last commit"
 				loading="lazy"
 			/>
-			</div>
+		</div>
 
 		<!-- Action: Create Room -->
 		<div class="space-y-4">
