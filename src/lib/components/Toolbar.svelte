@@ -139,6 +139,37 @@
 			</svg>
 		</button>
 
+		<!-- Line (L) -->
+		<button
+			onclick={() => selectTool('line')}
+			class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+			'line'
+				? 'bg-[#6366f1] text-white'
+				: 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'}"
+			title="Line (L) [Hold Shift for 45° snap]"
+			aria-label="Line tool"
+		>
+			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<line x1="5" y1="19" x2="19" y2="5" />
+			</svg>
+		</button>
+
+		<!-- Arrow (A) -->
+		<button
+			onclick={() => selectTool('arrow')}
+			class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+			'arrow'
+				? 'bg-[#6366f1] text-white'
+				: 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'}"
+			title="Arrow (A) [Hold Shift for 45° snap]"
+			aria-label="Arrow tool"
+		>
+			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<line x1="5" y1="19" x2="19" y2="5" />
+				<polyline points="10 5 19 5 19 14" />
+			</svg>
+		</button>
+
 		<!-- Rectangle (R) -->
 		<button
 			onclick={() => selectTool('rectangle')}

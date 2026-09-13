@@ -50,6 +50,10 @@
 				engine?.setTool('select');
 			} else if (e.key === 'p' || e.key === 'P') {
 				engine?.setTool('pen');
+			} else if (e.key === 'l' || e.key === 'L') {
+				engine?.setTool('line');
+			} else if (e.key === 'a' || e.key === 'A') {
+				engine?.setTool('arrow');
 			} else if (e.key === 'r' || e.key === 'R') {
 				engine?.setTool('rectangle');
 			} else if (e.key === 'e' || e.key === 'E') {

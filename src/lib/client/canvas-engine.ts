@@ -10,7 +10,16 @@ import {
 import type { PathPoint, PeerPresence, ShapeRecord, ShapeType } from '../types';
 import type { HistoryAction } from './history.svelte';
 
-export type ToolMode = 'select' | 'pen' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note' | 'pan';
+export type ToolMode =
+	| 'select'
+	| 'pen'
+	| 'line'
+	| 'arrow'
+	| 'rectangle'
+	| 'ellipse'
+	| 'text'
+	| 'sticky_note'
+	| 'pan';
 
 export interface ViewportState {
 	panX: number;
@@ -39,11 +48,18 @@ export class CanvasEngine {
 	fontSize = 18;
 
 	isSpacePressed = false;
+	isShiftPressed = false;
 
 	// Active operation
 	private isInteracting = false;
-	private interactionType: 'draw' | 'create_shape' | 'drag_selection' | 'marquee' | 'pan' | null =
-		null;
+	private interactionType:
+		| 'draw'
+		| 'create_shape'
+		| 'create_line'
+		| 'drag_selection'
+		| 'marquee'
+		| 'pan'
+		| null = null;
 	private startPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private currentPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private activePathPoints: PathPoint[] = [];
@@ -81,9 +97,11 @@ export class CanvasEngine {
 
 		window.addEventListener('keydown', (e) => {
 			if (e.code === 'Space') this.isSpacePressed = true;
+			if (e.key === 'Shift') this.isShiftPressed = true;
 		});
 		window.addEventListener('keyup', (e) => {
 			if (e.code === 'Space') this.isSpacePressed = false;
+			if (e.key === 'Shift') this.isShiftPressed = false;
 		});
 
 		this.resize();
@@ -175,6 +193,56 @@ export class CanvasEngine {
 		}
 	}
 
+	private calculateLineEndPoint(
+		start: { x: number; y: number },
+		current: { x: number; y: number },
+		snap: boolean
+	): { x: number; y: number } {
+		if (!snap) return current;
+		const dx = current.x - start.x;
+		const dy = current.y - start.y;
+		const dist = Math.sqrt(dx * dx + dy * dy);
+		let angle = Math.atan2(dy, dx);
+		const snapInterval = Math.PI / 4; // 45 degrees
+		angle = Math.round(angle / snapInterval) * snapInterval;
+		return {
+			x: start.x + dist * Math.cos(angle),
+			y: start.y + dist * Math.sin(angle)
+		};
+	}
+
+	private drawArrowHead(
+		ctx: CanvasRenderingContext2D,
+		fromX: number,
+		fromY: number,
+		toX: number,
+		toY: number,
+		color: string,
+		width: number
+	) {
+		const headLength = Math.max(width * 4, 12);
+		const angle = Math.atan2(toY - fromY, toX - fromX);
+		const arrowAngle = Math.PI / 6;
+
+		ctx.save();
+		ctx.fillStyle = color;
+		ctx.strokeStyle = color;
+		ctx.lineWidth = width;
+		ctx.beginPath();
+		ctx.moveTo(toX, toY);
+		ctx.lineTo(
+			toX - headLength * Math.cos(angle - arrowAngle),
+			toY - headLength * Math.sin(angle - arrowAngle)
+		);
+		ctx.lineTo(
+			toX - headLength * Math.cos(angle + arrowAngle),
+			toY - headLength * Math.sin(angle + arrowAngle)
+		);
+		ctx.closePath();
+		ctx.fill();
+		ctx.restore();
+	}
+
 	// -------------------------------------------------------------
 	// POINTER EVENT HANDLERS
 	// -------------------------------------------------------------
@@ -202,6 +270,12 @@ export class CanvasEngine {
 		if (this.tool === 'pen') {
 			this.interactionType = 'draw';
 			this.activePathPoints = [{ x: worldPos.x, y: worldPos.y, pressure: e.pressure || 0.5 }];
+			this.renderOverlay();
+			return;
+		}
+
+		if (this.tool === 'line' || this.tool === 'arrow') {
+			this.interactionType = 'create_line';
 			this.renderOverlay();
 			return;
 		}
@@ -296,7 +370,7 @@ export class CanvasEngine {
 			return;
 		}
 
-		if (this.interactionType === 'create_shape') {
+		if (this.interactionType === 'create_shape' || this.interactionType === 'create_line') {
 			this.renderOverlay();
 			return;
 		}
@@ -378,6 +452,42 @@ export class CanvasEngine {
 				this.onActionRecorded?.({ type: 'create', shape });
 			}
 			this.activePathPoints = [];
+		} else if (this.interactionType === 'create_line') {
+			const end = this.calculateLineEndPoint(
+				this.startPoint,
+				this.currentPoint,
+				this.isShiftPressed
+			);
+			const dx = end.x - this.startPoint.x;
+			const dy = end.y - this.startPoint.y;
+			if (Math.hypot(dx, dy) >= 3) {
+				const points: PathPoint[] = [
+					{ x: this.startPoint.x, y: this.startPoint.y, pressure: 0.5 },
+					{ x: end.x, y: end.y, pressure: 0.5 }
+				];
+				const bounds = this.calculatePointsBounds(points);
+				const isArrow = this.tool === 'arrow';
+
+				const shape: ShapeRecord = {
+					id: 'shape_' + Math.random().toString(36).substring(2, 9),
+					type: 'path',
+					x: bounds.minX,
+					y: bounds.minY,
+					width: bounds.width,
+					height: bounds.height,
+					fill: 'transparent',
+					stroke: this.strokeColor,
+					strokeWidth: this.strokeWidth,
+					rotation: 0,
+					zIndex: this.getNextZIndex(),
+					data: { points, isArrow },
+					createdBy: '',
+					updatedAt: now
+				};
+
+				this.onShapesMutated?.([shape]);
+				this.onActionRecorded?.({ type: 'create', shape });
+			}
 		} else if (this.interactionType === 'create_shape') {
 			const x = Math.min(this.startPoint.x, this.currentPoint.x);
 			const y = Math.min(this.startPoint.y, this.currentPoint.y);
@@ -617,7 +727,40 @@ export class CanvasEngine {
 			ctx.stroke();
 		}
 
-		// 2. Draw in-progress shape preview (rect, ellipse, sticky note)
+		// 2. Draw in-progress line or arrow preview
+		if (this.interactionType === 'create_line') {
+			const end = this.calculateLineEndPoint(
+				this.startPoint,
+				this.currentPoint,
+				this.isShiftPressed
+			);
+			ctx.save();
+			ctx.strokeStyle = this.strokeColor;
+			ctx.fillStyle = this.strokeColor;
+			ctx.lineWidth = this.strokeWidth;
+			ctx.lineCap = 'round';
+			ctx.lineJoin = 'round';
+
+			ctx.beginPath();
+			ctx.moveTo(this.startPoint.x, this.startPoint.y);
+			ctx.lineTo(end.x, end.y);
+			ctx.stroke();
+
+			if (this.tool === 'arrow') {
+				this.drawArrowHead(
+					ctx,
+					this.startPoint.x,
+					this.startPoint.y,
+					end.x,
+					end.y,
+					this.strokeColor,
+					this.strokeWidth
+				);
+			}
+			ctx.restore();
+		}
+
+		// 3. Draw in-progress shape preview (rect, ellipse, sticky note)
 		if (this.interactionType === 'create_shape') {
 			const x = Math.min(this.startPoint.x, this.currentPoint.x);
 			const y = Math.min(this.startPoint.y, this.currentPoint.y);
@@ -737,6 +880,20 @@ export class CanvasEngine {
 					ctx.lineTo(points[i].x, points[i].y);
 				}
 				ctx.stroke();
+
+				if (shape.data?.isArrow && points.length >= 2) {
+					const p1 = points[points.length - 2];
+					const p2 = points[points.length - 1];
+					this.drawArrowHead(
+						ctx,
+						p1.x,
+						p1.y,
+						p2.x,
+						p2.y,
+						shape.stroke || '#f4f4f5',
+						shape.strokeWidth || 2
+					);
+				}
 			}
 		} else if (shape.type === 'rectangle') {
 			ctx.beginPath();
@@ -903,6 +1060,19 @@ export class CanvasEngine {
 				if (points.length >= 2) {
 					const d = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 					svgContent += `<path d="${d}" fill="none" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+
+					if (shape.data?.isArrow && points.length >= 2) {
+						const p1 = points[points.length - 2];
+						const p2 = points[points.length - 1];
+						const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
+						const headLength = Math.max((shape.strokeWidth || 2) * 4, 12);
+						const arrowAngle = Math.PI / 6;
+						const x1 = p2.x - headLength * Math.cos(angle - arrowAngle);
+						const y1 = p2.y - headLength * Math.sin(angle - arrowAngle);
+						const x2 = p2.x - headLength * Math.cos(angle + arrowAngle);
+						const y2 = p2.y - headLength * Math.sin(angle + arrowAngle);
+						svgContent += `<polygon points="${p2.x},${p2.y} ${x1},${y1} ${x2},${y2}" fill="${shape.stroke}"/>\n`;
+					}
 				}
 			} else if (shape.type === 'rectangle') {
 				svgContent += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="4" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
