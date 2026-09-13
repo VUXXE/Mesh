@@ -653,7 +653,17 @@ export class CanvasEngine {
 					const shape = this.shapes.get(id);
 					if (shape) {
 						this.dragInitialPositions.set(id, { x: shape.x, y: shape.y });
-						this.dragInitialShapes.set(id, { ...shape });
+						const snapshot: ShapeRecord =
+							shape.type === 'path'
+								? {
+										...shape,
+										data: {
+											...shape.data,
+											points: (shape.data?.points ?? []).map((p: PathPoint) => ({ ...p }))
+										}
+									}
+								: { ...shape };
+						this.dragInitialShapes.set(id, snapshot);
 					}
 				}
 			} else {
@@ -796,6 +806,13 @@ export class CanvasEngine {
 				if (shape) {
 					shape.x = initialPos.x + dx;
 					shape.y = initialPos.y + dy;
+					if (shape.type === 'path') {
+						const initialPoints: PathPoint[] = this.dragInitialShapes.get(id)?.data?.points ?? [];
+						shape.data = {
+							...shape.data,
+							points: initialPoints.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
+						};
+					}
 				}
 			}
 
@@ -979,7 +996,17 @@ export class CanvasEngine {
 				const initial = this.dragInitialShapes.get(id);
 				if (shape && initial && (shape.x !== initial.x || shape.y !== initial.y)) {
 					shape.updatedAt = now;
-					movedShapes.push({ ...shape });
+					const moved: ShapeRecord =
+						shape.type === 'path'
+							? {
+									...shape,
+									data: {
+										...shape.data,
+										points: (shape.data?.points ?? []).map((p: PathPoint) => ({ ...p }))
+									}
+								}
+							: { ...shape };
+					movedShapes.push(moved);
 					beforeShapes.push(initial);
 				}
 			}
