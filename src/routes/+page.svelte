@@ -76,6 +76,63 @@
 			</div>
 		</div>
 
+		<!-- GitHub repo badges -->
+		<div class="mb-6 flex flex-wrap items-center gap-1.5">
+			<a
+				href="https://github.com/VUXXE/Mesh"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="transition-opacity hover:opacity-80"
+			>
+				<img
+					src="https://img.shields.io/github/stars/VUXXE/Mesh?style=flat-square&logo=github&logoColor=white&label=Stars"
+					alt="GitHub stars"
+					loading="lazy"
+				/>
+			</a>
+			<a
+				href="https://github.com/VUXXE/Mesh/fork"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="transition-opacity hover:opacity-80"
+			>
+				<img
+					src="https://img.shields.io/github/forks/VUXXE/Mesh?style=flat-square&logo=github&logoColor=white"
+					alt="GitHub forks"
+					loading="lazy"
+				/>
+			</a>
+			<a
+				href="https://github.com/VUXXE/Mesh/issues"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="transition-opacity hover:opacity-80"
+			>
+				<img
+					src="https://img.shields.io/github/issues/VUXXE/Mesh?style=flat-square&logo=github&logoColor=white"
+					alt="GitHub issues"
+					loading="lazy"
+				/>
+			</a>
+			<a
+				href="https://github.com/VUXXE/Mesh/blob/main/LICENSE"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="transition-opacity hover:opacity-80"
+			>
+				<img
+					src="https://img.shields.io/github/license/VUXXE/Mesh?style=flat-square"
+					alt="License"
+					loading="lazy"
+				/>
+			</a>
+			<img
+				src="https://img.shields.io/github/last-commit/VUXXE/Mesh/main?style=flat-square&logo=github&logoColor=white"
+				alt="Last commit"
+				loading="lazy"
+			/>
+		</div>
+
 		<!-- Action: Create Room -->
 		<div class="space-y-4">
 			<div class="space-y-2">
