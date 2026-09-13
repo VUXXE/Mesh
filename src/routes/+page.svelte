@@ -36,7 +36,7 @@
 </script>
 
 <svelte:head>
-	<title>CanvasSync: Serverless Real-Time Vector Whiteboard</title>
+	<title>Mesh: Serverless Real-Time Vector Whiteboard</title>
 </svelte:head>
 
 <main
@@ -59,7 +59,7 @@
 				</svg>
 			</div>
 			<div>
-				<h1 class="text-xl font-bold tracking-tight text-[#f4f4f5]">CanvasSync</h1>
+				<h1 class="text-xl font-bold tracking-tight text-[#f4f4f5]">Mesh</h1>
 				<p class="text-xs text-[#a1a1aa]">Real-time collaborative vector whiteboard</p>
 			</div>
 		</div>

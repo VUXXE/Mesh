@@ -88,7 +88,7 @@
 </script>
 
 <svelte:head>
-	<title>CanvasSync: Room {roomId}</title>
+	<title>Mesh: Room {roomId}</title>
 </svelte:head>
 
 {#if !isValidRoomId}

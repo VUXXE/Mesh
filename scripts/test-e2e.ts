@@ -1,4 +1,4 @@
-const PORT = 8789;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 8789;
 const BASE_URL = `http://127.0.0.1:${PORT}`;
 
 function sleep(ms: number) {
@@ -30,10 +30,10 @@ async function runE2ETest() {
 	console.log('\n[1] Testing Landing Page: GET /');
 	const homeRes = await fetch(`${BASE_URL}/`);
 	const homeHtml = await homeRes.text();
-	if (homeRes.status !== 200 || !homeHtml.includes('CanvasSync')) {
+	if (homeRes.status !== 200 || !homeHtml.includes('Mesh')) {
 		throw new Error(`Landing page check failed. Status: ${homeRes.status}`);
 	}
-	console.log('PASSED: Landing page rendered with CanvasSync branding.');
+	console.log('PASSED: Landing page rendered with Mesh branding.');
 
 	// 2. Verify Room Page SSR Shell
 	console.log('\n[2] Testing Whiteboard Room Page: GET /room/board-alpha');

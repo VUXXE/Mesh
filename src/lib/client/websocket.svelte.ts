@@ -43,23 +43,26 @@ export class RoomSocket {
 	private initUser() {
 		if (typeof window === 'undefined') return;
 
-		let userId = localStorage.getItem('canvas_sync_user_id');
+		let userId =
+			localStorage.getItem('mesh_user_id') || localStorage.getItem('canvas_sync_user_id');
 		if (!userId) {
 			userId = 'user_' + Math.random().toString(36).substring(2, 9);
-			localStorage.setItem('canvas_sync_user_id', userId);
+			localStorage.setItem('mesh_user_id', userId);
 		}
 
-		let name = localStorage.getItem('canvas_sync_user_name');
+		let name =
+			localStorage.getItem('mesh_user_name') || localStorage.getItem('canvas_sync_user_name');
 		if (!name) {
 			const randomSuffix = Math.floor(100 + Math.random() * 900);
 			name = `Artist ${randomSuffix}`;
-			localStorage.setItem('canvas_sync_user_name', name);
+			localStorage.setItem('mesh_user_name', name);
 		}
 
-		let color = localStorage.getItem('canvas_sync_user_color');
+		let color =
+			localStorage.getItem('mesh_user_color') || localStorage.getItem('canvas_sync_user_color');
 		if (!color) {
 			color = PALETTE[Math.floor(Math.random() * PALETTE.length)];
-			localStorage.setItem('canvas_sync_user_color', color);
+			localStorage.setItem('mesh_user_color', color);
 		}
 
 		this.currentUser = { userId, name, color };
@@ -70,7 +73,7 @@ export class RoomSocket {
 		if (!trimmed) return;
 		this.currentUser.name = trimmed;
 		if (typeof window !== 'undefined') {
-			localStorage.setItem('canvas_sync_user_name', trimmed);
+			localStorage.setItem('mesh_user_name', trimmed);
 		}
 		this.sendPresenceImmediate(this.pendingCursor, this.pendingSelectedIds);
 	}
@@ -78,7 +81,7 @@ export class RoomSocket {
 	setUserColor(newColor: string) {
 		this.currentUser.color = newColor;
 		if (typeof window !== 'undefined') {
-			localStorage.setItem('canvas_sync_user_color', newColor);
+			localStorage.setItem('mesh_user_color', newColor);
 		}
 		this.sendPresenceImmediate(this.pendingCursor, this.pendingSelectedIds);
 	}

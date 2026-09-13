@@ -1,4 +1,4 @@
-# CanvasSync
+# Mesh
 
 Serverless real-time collaborative vector whiteboard built with SvelteKit 2 (Svelte 5 Runes) and Cloudflare Workers (Durable Objects with embedded SQLite and WebSocket Hibernation).
 
