@@ -59,12 +59,43 @@
 		engine?.deleteSelected();
 	}
 
+	let showExportMenu = $state(false);
+	let fileInputRef: HTMLInputElement;
+
 	function handleExportPng() {
+		showExportMenu = false;
 		engine?.exportToPng();
 	}
 
 	function handleExportSvg() {
+		showExportMenu = false;
 		engine?.exportToSvg();
+	}
+
+	function handleExportJson() {
+		showExportMenu = false;
+		engine?.exportToJson();
+	}
+
+	function triggerImport() {
+		showExportMenu = false;
+		fileInputRef?.click();
+	}
+
+	function handleFileSelected(e: Event) {
+		const target = e.target as HTMLInputElement;
+		const file = target.files?.[0];
+		if (!file) return;
+
+		const reader = new FileReader();
+		reader.onload = (event) => {
+			const content = event.target?.result as string;
+			if (content) {
+				engine?.importFromJson(content);
+			}
+			target.value = '';
+		};
+		reader.readAsText(file);
 	}
 </script>
 
@@ -331,24 +362,81 @@
 			</svg>
 		</button>
 
-		<!-- Export PNG -->
-		<button
-			onclick={handleExportPng}
-			class="rounded-lg p-2 font-mono text-xs text-[#a1a1aa] transition-colors hover:bg-[#27272a] hover:text-[#f4f4f5] focus:outline-none"
-			title="Export PNG"
-			aria-label="Export PNG"
-		>
-			PNG
-		</button>
+		<!-- Hidden File Input for JSON Import -->
+		<input
+			bind:this={fileInputRef}
+			type="file"
+			accept=".json"
+			onchange={handleFileSelected}
+			class="hidden"
+		/>
 
-		<!-- Export SVG -->
-		<button
-			onclick={handleExportSvg}
-			class="rounded-lg p-2 font-mono text-xs text-[#a1a1aa] transition-colors hover:bg-[#27272a] hover:text-[#f4f4f5] focus:outline-none"
-			title="Export SVG"
-			aria-label="Export SVG"
-		>
-			SVG
-		</button>
+		<!-- Export / Import Menu Button -->
+		<div class="relative">
+			<button
+				onclick={() => (showExportMenu = !showExportMenu)}
+				class="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none {showExportMenu
+					? 'bg-[#27272a] text-[#f4f4f5]'
+					: 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'}"
+				title="Export or Import whiteboard"
+				aria-label="Export or Import whiteboard"
+			>
+				<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+					<polyline points="7 10 12 15 17 10" />
+					<line x1="12" y1="15" x2="12" y2="3" />
+				</svg>
+				<span>Export</span>
+			</button>
+
+			<!-- Export Popover Menu -->
+			{#if showExportMenu}
+				<div
+					class="absolute bottom-full mb-3 right-0 z-30 w-48 rounded-xl border border-[#27272a] bg-[#18181b] p-1.5 shadow-2xl backdrop-blur-md"
+				>
+					<div class="px-2 py-1 text-[10px] font-semibold tracking-wider text-[#71717a] uppercase">
+						Export
+					</div>
+					<button
+						onclick={handleExportPng}
+						class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-[#f4f4f5] transition-colors hover:bg-[#27272a]"
+					>
+						<span class="font-mono text-[10px] font-bold text-[#6366f1]">PNG</span>
+						<span>Image (2x Retina)</span>
+					</button>
+					<button
+						onclick={handleExportSvg}
+						class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-[#f4f4f5] transition-colors hover:bg-[#27272a]"
+					>
+						<span class="font-mono text-[10px] font-bold text-[#10b981]">SVG</span>
+						<span>Vector Graphics</span>
+					</button>
+					<button
+						onclick={handleExportJson}
+						class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-[#f4f4f5] transition-colors hover:bg-[#27272a]"
+					>
+						<span class="font-mono text-[10px] font-bold text-[#06b6d4]">JSON</span>
+						<span>Mesh Room Backup</span>
+					</button>
+
+					<div class="my-1 border-t border-[#27272a]"></div>
+
+					<div class="px-2 py-1 text-[10px] font-semibold tracking-wider text-[#71717a] uppercase">
+						Import
+					</div>
+					<button
+						onclick={triggerImport}
+						class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-[#f4f4f5] transition-colors hover:bg-[#27272a]"
+					>
+						<svg class="h-3.5 w-3.5 text-[#f59e0b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+							<polyline points="17 8 12 3 7 8" />
+							<line x1="12" y1="3" x2="12" y2="15" />
+						</svg>
+						<span>Load JSON File</span>
+					</button>
+				</div>
+			{/if}
+		</div>
 	</div>
 </div>
