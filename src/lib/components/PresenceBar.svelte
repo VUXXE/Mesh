@@ -12,7 +12,8 @@
 
 	let { roomId, status, currentUser, peers, onUpdateUserName }: Props = $props();
 
-	let copied = $state(false);
+	let copiedCode = $state(false);
+	let copiedLink = $state(false);
 	let isEditingName = $state(false);
 	let nameInput = $state('');
 
@@ -20,12 +21,21 @@
 		nameInput = currentUser.name;
 	});
 
+	function copyRoomCode() {
+		if (typeof window === 'undefined') return;
+		navigator.clipboard.writeText(roomId);
+		copiedCode = true;
+		setTimeout(() => {
+			copiedCode = false;
+		}, 2000);
+	}
+
 	function copyRoomLink() {
 		if (typeof window === 'undefined') return;
 		navigator.clipboard.writeText(window.location.href);
-		copied = true;
+		copiedLink = true;
 		setTimeout(() => {
-			copied = false;
+			copiedLink = false;
 		}, 2000);
 	}
 
@@ -55,20 +65,36 @@
 </script>
 
 <div class="fixed top-4 right-4 z-20 flex items-center gap-2 select-none">
-	<!-- Room ID & Copy Link Pill -->
+	<!-- Room ID & Copy Options Pill -->
 	<div
 		class="flex items-center gap-1.5 rounded-lg border border-[#27272a] bg-[#18181b] px-3 py-1.5 shadow-lg backdrop-blur-md"
 	>
 		<span class="text-xs text-[#a1a1aa]">Room:</span>
-		<span class="font-mono text-xs font-semibold text-[#f4f4f5]">{roomId}</span>
 		<button
-			onclick={copyRoomLink}
-			class="ml-1 rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copied
+			onclick={copyRoomCode}
+			class="font-mono text-xs font-semibold text-[#f4f4f5] transition-colors hover:text-[#6366f1] focus:outline-none"
+			title="Click to copy code"
+		>
+			{roomId}
+		</button>
+		<div class="mx-0.5 h-3.5 w-px bg-[#27272a]"></div>
+		<button
+			onclick={copyRoomCode}
+			class="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copiedCode
 				? 'bg-emerald-500/20 text-emerald-300'
 				: 'bg-[#27272a] text-[#a1a1aa] hover:text-[#f4f4f5]'}"
-			title="Copy invitation link"
+			title="Copy room code only ({roomId})"
 		>
-			{copied ? 'Copied!' : 'Copy'}
+			{copiedCode ? 'Code Copied!' : 'Copy Code'}
+		</button>
+		<button
+			onclick={copyRoomLink}
+			class="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copiedLink
+				? 'bg-emerald-500/20 text-emerald-300'
+				: 'bg-[#27272a] text-[#a1a1aa] hover:text-[#f4f4f5]'}"
+			title="Copy full invite link"
+		>
+			{copiedLink ? 'Link Copied!' : 'Copy Link'}
 		</button>
 	</div>
 
