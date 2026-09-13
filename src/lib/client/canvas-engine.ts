@@ -190,6 +190,7 @@ export class CanvasEngine {
 
 	private toolChangedListeners: ((tool: ToolMode) => void)[] = [];
 	private selectionListeners: ((selectedIds: string[]) => void)[] = [];
+	private viewportListeners: ((vp: ViewportState) => void)[] = [];
 
 	addToolChangedListener(fn: (tool: ToolMode) => void) {
 		this.toolChangedListeners.push(fn);
@@ -204,6 +205,20 @@ export class CanvasEngine {
 		return () => {
 			this.selectionListeners = this.selectionListeners.filter((l) => l !== fn);
 		};
+	}
+
+	addViewportListener(fn: (vp: ViewportState) => void) {
+		this.viewportListeners.push(fn);
+		return () => {
+			this.viewportListeners = this.viewportListeners.filter((l) => l !== fn);
+		};
+	}
+
+	private emitViewportChanged() {
+		this.onViewportChanged?.(this.viewport);
+		for (const fn of this.viewportListeners) {
+			fn(this.viewport);
+		}
 	}
 
 	setSelectedIds(ids: string[]) {
@@ -712,7 +727,7 @@ export class CanvasEngine {
 				this.viewport.panY =
 					mY - (mY - this.initialPinchPan.y) * (newZoom / this.initialPinchZoom) + panDeltaY;
 
-				this.onViewportChanged?.(this.viewport);
+				this.emitViewportChanged();
 				this.renderBuffer();
 				this.renderOverlay();
 			}
@@ -801,7 +816,7 @@ export class CanvasEngine {
 		if (this.interactionType === 'pan') {
 			this.viewport.panX += e.movementX;
 			this.viewport.panY += e.movementY;
-			this.onViewportChanged?.(this.viewport);
+			this.emitViewportChanged();
 			this.renderBuffer();
 			this.renderOverlay();
 			return;
@@ -1112,7 +1127,7 @@ export class CanvasEngine {
 			this.viewport.panY -= e.deltaY;
 		}
 
-		this.onViewportChanged?.(this.viewport);
+		this.emitViewportChanged();
 		this.renderBuffer();
 		this.renderOverlay();
 	}
@@ -1121,7 +1136,7 @@ export class CanvasEngine {
 		this.viewport.zoom = 1;
 		this.viewport.panX = 0;
 		this.viewport.panY = 0;
-		this.onViewportChanged?.(this.viewport);
+		this.emitViewportChanged();
 		this.renderBuffer();
 		this.renderOverlay();
 	}
