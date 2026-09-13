@@ -979,7 +979,7 @@ export class CanvasEngine {
 	// EXPORT UTILITIES (PRD §10 Phase 4)
 	// -------------------------------------------------------------
 
-	exportToPng(filename = 'whiteboard.png') {
+	exportToPng(filename = 'mesh-whiteboard.png', scale = 2) {
 		if (this.shapes.size === 0) {
 			alert('Canvas is empty.');
 			return;
@@ -1004,10 +1004,12 @@ export class CanvasEngine {
 		const h = maxY - minY + padding * 2;
 
 		const offscreen = document.createElement('canvas');
-		offscreen.width = w;
-		offscreen.height = h;
+		offscreen.width = w * scale;
+		offscreen.height = h * scale;
 		const offCtx = offscreen.getContext('2d');
 		if (!offCtx) return;
+
+		offCtx.scale(scale, scale);
 
 		// Dark canvas background (#121214)
 		offCtx.fillStyle = '#121214';
@@ -1027,7 +1029,7 @@ export class CanvasEngine {
 		a.click();
 	}
 
-	exportToSvg(filename = 'whiteboard.svg') {
+	exportToSvg(filename = 'mesh-whiteboard.svg') {
 		if (this.shapes.size === 0) {
 			alert('Canvas is empty.');
 			return;
@@ -1102,5 +1104,79 @@ export class CanvasEngine {
 		a.download = filename;
 		a.click();
 		URL.revokeObjectURL(url);
+	}
+
+	exportToJson(filename = 'mesh-whiteboard.json') {
+		if (this.shapes.size === 0) {
+			alert('Canvas is empty.');
+			return;
+		}
+
+		const exportData = {
+			app: 'Mesh',
+			version: '1.0.0',
+			exportedAt: new Date().toISOString(),
+			shapes: Array.from(this.shapes.values())
+		};
+
+		const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const a = document.createElement('a');
+		a.href = url;
+		a.download = filename;
+		a.click();
+		URL.revokeObjectURL(url);
+	}
+
+	importFromJson(jsonString: string): ShapeRecord[] | null {
+		try {
+			const parsed = JSON.parse(jsonString);
+			const rawShapes = Array.isArray(parsed) ? parsed : parsed.shapes;
+			if (!Array.isArray(rawShapes) || rawShapes.length === 0) {
+				alert('No valid shapes found in JSON file.');
+				return null;
+			}
+
+			const now = Date.now();
+			let baseZ = this.getNextZIndex();
+			const importedShapes: ShapeRecord[] = [];
+
+			for (const item of rawShapes) {
+				if (!item.type || typeof item.x !== 'number' || typeof item.y !== 'number') {
+					continue;
+				}
+				const shape: ShapeRecord = {
+					id: 'shape_' + Math.random().toString(36).substring(2, 9),
+					type: item.type,
+					x: item.x,
+					y: item.y,
+					width: item.width || 50,
+					height: item.height || 50,
+					fill: item.fill || 'transparent',
+					stroke: item.stroke || '#f4f4f5',
+					strokeWidth: item.strokeWidth || 2,
+					rotation: item.rotation || 0,
+					zIndex: baseZ++,
+					data: item.data,
+					createdBy: '',
+					updatedAt: now
+				};
+				importedShapes.push(shape);
+			}
+
+			if (importedShapes.length > 0) {
+				this.onShapesMutated?.(importedShapes);
+				this.onActionRecorded?.({
+					type: 'modify',
+					before: [],
+					after: importedShapes
+				});
+				return importedShapes;
+			}
+			return null;
+		} catch {
+			alert('Invalid JSON file format.');
+			return null;
+		}
 	}
 }
