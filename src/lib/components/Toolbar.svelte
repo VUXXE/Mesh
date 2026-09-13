@@ -28,7 +28,6 @@
 	let activeFontFamily = $state<string>('sans');
 	let activeFontSize = $state<number>(18);
 	let isTextShapeSelected = $state<boolean>(false);
-	let isLight = $state<boolean>(false);
 
 	const FONT_FAMILY_OPTIONS = [
 		{ label: 'Sans', value: 'sans', css: FONT_FAMILIES.sans },
@@ -68,7 +67,6 @@
 			activeWidth = engine.strokeWidth;
 			activeFontFamily = engine.fontFamily;
 			activeFontSize = engine.fontSize;
-			initTheme();
 			updateSelectedState();
 
 			engine.onToolChanged = (tool) => {
@@ -156,24 +154,6 @@
 
 	function handleDelete() {
 		engine?.deleteSelected();
-	}
-
-	function initTheme() {
-		if (typeof document === 'undefined') return;
-		isLight = document.documentElement.classList.contains('light');
-	}
-
-	function toggleTheme() {
-		isLight = !isLight;
-		if (typeof document !== 'undefined') {
-			document.documentElement.classList.toggle('light', isLight);
-		}
-		try {
-			localStorage.setItem('mesh_theme', isLight ? 'light' : 'dark');
-		} catch {
-			// Ignore storage errors (private mode, etc.)
-		}
-		engine?.applyTheme();
 	}
 
 	let showExportMenu = $state(false);
@@ -557,42 +537,6 @@
 
 	<!-- Export / Import Menu Button -->
 	<div class="relative shrink-0">
-		<button
-			onclick={toggleTheme}
-			class="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
-			title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-			aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-		>
-			{#if isLight}
-				<svg
-					class="h-3.5 w-3.5"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<circle cx="12" cy="12" r="4" />
-					<path d="M12 2v2" />
-					<path d="M12 20v2" />
-					<path d="M4.93 4.93l1.41 1.41" />
-					<path d="M17.66 17.66l1.41 1.41" />
-					<path d="M2 12h2" />
-					<path d="M20 12h2" />
-					<path d="M6.34 17.66l-1.41 1.41" />
-					<path d="M19.07 4.93l-1.41 1.41" />
-				</svg>
-			{:else}
-				<svg
-					class="h-3.5 w-3.5"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-				>
-					<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-				</svg>
-			{/if}
-		</button>
 		<button
 			onclick={() => (showExportMenu = !showExportMenu)}
 			class="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none {showExportMenu

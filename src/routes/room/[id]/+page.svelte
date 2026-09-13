@@ -216,6 +216,7 @@
 			currentUser={socket.currentUser}
 			peers={socket.peers}
 			locked={socket.authRequired}
+			{engine}
 			onUpdateUserName={handleUpdateUserName}
 		/>
 
