@@ -1,0 +1,19 @@
+services:
+  mesh:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: mesh:latest
+    container_name: mesh-whiteboard
+    restart: unless-stopped
+    ports:
+      - '4173:4173'
+    environment:
+      - PORT=4173
+      - PERSIST_DIR=/data
+    volumes:
+      - mesh_data:/data
+
+volumes:
+  mesh_data:
+    name: mesh_data

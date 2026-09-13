@@ -11,15 +11,7 @@ import type { PathPoint, PeerPresence, ShapeRecord, ShapeType } from '../types';
 import type { HistoryAction } from './history.svelte';
 
 export type ToolMode =
-	| 'select'
-	| 'pen'
-	| 'line'
-	| 'arrow'
-	| 'rectangle'
-	| 'ellipse'
-	| 'text'
-	| 'sticky_note'
-	| 'pan';
+	'select' | 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note' | 'pan';
 
 export interface ViewportState {
 	panX: number;
