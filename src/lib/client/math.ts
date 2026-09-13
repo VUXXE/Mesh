@@ -229,7 +229,13 @@ export function worldToScreen(
 export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w';
 
 export function isResizableShape(type: ShapeType): boolean {
-	return type === 'rectangle' || type === 'ellipse' || type === 'sticky_note' || type === 'text';
+	return (
+		type === 'rectangle' ||
+		type === 'ellipse' ||
+		type === 'sticky_note' ||
+		type === 'text' ||
+		type === 'path'
+	);
 }
 
 export function getResizeHandles(

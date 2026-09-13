@@ -618,7 +618,17 @@ export class CanvasEngine {
 						this.resizeInitialPointer = { x: worldPos.x, y: worldPos.y };
 						this.resizeInitialShape = {
 							...selectedShape,
-							data: selectedShape.data ? { ...selectedShape.data } : undefined
+							data:
+								selectedShape.type === 'path'
+									? {
+											...selectedShape.data,
+											points: (selectedShape.data?.points ?? []).map((p: PathPoint) => ({
+												...p
+											}))
+										}
+									: selectedShape.data
+										? { ...selectedShape.data }
+										: undefined
 						};
 						this.overlayCanvas.style.cursor = getResizeCursor(hitHandle);
 						this.renderOverlay();
@@ -764,6 +774,22 @@ export class CanvasEngine {
 				shape.data = {
 					...shape.data,
 					fontSize: Math.max(Math.round(initialFontSize * scale), 8)
+				};
+			}
+
+			if (shape.type === 'path') {
+				const initialPoints: PathPoint[] = this.resizeInitialShape.data?.points ?? [];
+				const scaleX =
+					this.resizeInitialShape.width > 0 ? resized.width / this.resizeInitialShape.width : 1;
+				const scaleY =
+					this.resizeInitialShape.height > 0 ? resized.height / this.resizeInitialShape.height : 1;
+				shape.data = {
+					...shape.data,
+					points: initialPoints.map((p) => ({
+						...p,
+						x: resized.x + (p.x - this.resizeInitialShape!.x) * scaleX,
+						y: resized.y + (p.y - this.resizeInitialShape!.y) * scaleY
+					}))
 				};
 			}
 
@@ -1033,7 +1059,16 @@ export class CanvasEngine {
 						shape.data?.fontSize !== initial.data?.fontSize)
 				) {
 					shape.updatedAt = now;
-					const mutated = { ...shape };
+					const mutated: ShapeRecord =
+						shape.type === 'path'
+							? {
+									...shape,
+									data: {
+										...shape.data,
+										points: (shape.data?.points ?? []).map((p: PathPoint) => ({ ...p }))
+									}
+								}
+							: { ...shape };
 					this.onShapesMutated?.([mutated]);
 					this.onActionRecorded?.({
 						type: 'modify',
