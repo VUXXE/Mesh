@@ -25,6 +25,24 @@
 	let activeColor = $state<string>('#f4f4f5');
 	let activeWidth = $state<number>(2);
 
+	$effect(() => {
+		if (engine) {
+			activeTool = engine.tool;
+			activeColor = engine.strokeColor;
+			activeWidth = engine.strokeWidth;
+
+			engine.onToolChanged = (tool) => {
+				activeTool = tool;
+			};
+			engine.onStrokeColorChanged = (color) => {
+				activeColor = color;
+			};
+			engine.onStrokeWidthChanged = (width) => {
+				activeWidth = width;
+			};
+		}
+	});
+
 	const STROKE_COLORS = [
 		{ label: 'White', value: '#f4f4f5' },
 		{ label: 'Indigo', value: '#6366f1' },

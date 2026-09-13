@@ -80,6 +80,9 @@ export class CanvasEngine {
 	onCursorMoved?: (pos: { x: number; y: number } | null) => void;
 	onViewportChanged?: (vp: ViewportState) => void;
 	onActionRecorded?: (action: HistoryAction) => void;
+	onToolChanged?: (tool: ToolMode) => void;
+	onStrokeColorChanged?: (color: string) => void;
+	onStrokeWidthChanged?: (width: number) => void;
 
 	constructor(staticCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement) {
 		this.staticCanvas = staticCanvas;
@@ -147,11 +150,13 @@ export class CanvasEngine {
 			this.onSelectionChanged?.(this.selectedIds);
 		}
 		this.renderOverlay();
+		this.onToolChanged?.(tool);
 	}
 
 	setStrokeColor(color: string) {
 		this.strokeColor = color;
 		this.applyPropertyToSelection({ stroke: color });
+		this.onStrokeColorChanged?.(color);
 	}
 
 	setFillColor(color: string) {
@@ -162,6 +167,7 @@ export class CanvasEngine {
 	setStrokeWidth(width: number) {
 		this.strokeWidth = width;
 		this.applyPropertyToSelection({ strokeWidth: width });
+		this.onStrokeWidthChanged?.(width);
 	}
 
 	private applyPropertyToSelection(props: Partial<ShapeRecord>) {
