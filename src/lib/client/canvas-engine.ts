@@ -59,10 +59,18 @@ export class CanvasEngine {
 		| 'drag_selection'
 		| 'marquee'
 		| 'pan'
+		| 'pinch_zoom'
 		| null = null;
 	private startPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private currentPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private activePathPoints: PathPoint[] = [];
+
+	// Multi-touch tracking
+	private activePointers = new Map<number, { x: number; y: number }>();
+	private initialPinchDist = 0;
+	private initialPinchMidpoint = { x: 0, y: 0 };
+	private initialPinchZoom = 1;
+	private initialPinchPan = { x: 0, y: 0 };
 
 	// Selection state
 	selectedIds: string[] = [];
@@ -248,6 +256,26 @@ export class CanvasEngine {
 	// -------------------------------------------------------------
 
 	handlePointerDown(e: PointerEvent) {
+		this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+		// Multi-touch pinch-to-zoom and two-finger pan
+		if (this.activePointers.size === 2) {
+			const [p1, p2] = Array.from(this.activePointers.values());
+			this.initialPinchDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+			this.initialPinchMidpoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+			this.initialPinchZoom = this.viewport.zoom;
+			this.initialPinchPan = { x: this.viewport.panX, y: this.viewport.panY };
+			this.interactionType = 'pinch_zoom';
+			this.isInteracting = true;
+			this.activePathPoints = [];
+			this.renderOverlay();
+			return;
+		}
+
+		if (this.activePointers.size > 2) {
+			return;
+		}
+
 		const screenPos = { x: e.clientX, y: e.clientY };
 		const worldPos = screenToWorld(
 			screenPos.x,
@@ -334,6 +362,37 @@ export class CanvasEngine {
 	}
 
 	handlePointerMove(e: PointerEvent) {
+		if (this.activePointers.has(e.pointerId)) {
+			this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+		}
+
+		if (this.activePointers.size === 2 && this.interactionType === 'pinch_zoom') {
+			const [p1, p2] = Array.from(this.activePointers.values());
+			const currentDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+			const currentMidpoint = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+
+			if (this.initialPinchDist > 0) {
+				const scale = currentDist / this.initialPinchDist;
+				const newZoom = Math.min(Math.max(this.initialPinchZoom * scale, 0.1), 5.0);
+
+				const mX = this.initialPinchMidpoint.x;
+				const mY = this.initialPinchMidpoint.y;
+				const panDeltaX = currentMidpoint.x - this.initialPinchMidpoint.x;
+				const panDeltaY = currentMidpoint.y - this.initialPinchMidpoint.y;
+
+				this.viewport.zoom = newZoom;
+				this.viewport.panX =
+					mX - (mX - this.initialPinchPan.x) * (newZoom / this.initialPinchZoom) + panDeltaX;
+				this.viewport.panY =
+					mY - (mY - this.initialPinchPan.y) * (newZoom / this.initialPinchZoom) + panDeltaY;
+
+				this.onViewportChanged?.(this.viewport);
+				this.renderBuffer();
+				this.renderOverlay();
+			}
+			return;
+		}
+
 		const screenPos = { x: e.clientX, y: e.clientY };
 		const worldPos = screenToWorld(
 			screenPos.x,
@@ -421,7 +480,22 @@ export class CanvasEngine {
 		}
 	}
 
-	handlePointerUp() {
+	handlePointerUp(e?: PointerEvent) {
+		if (e) {
+			this.activePointers.delete(e.pointerId);
+		} else {
+			this.activePointers.clear();
+		}
+
+		if (this.interactionType === 'pinch_zoom') {
+			if (this.activePointers.size < 2) {
+				this.isInteracting = false;
+				this.interactionType = null;
+				this.initialPinchDist = 0;
+			}
+			return;
+		}
+
 		if (!this.isInteracting) return;
 
 		const now = Date.now();

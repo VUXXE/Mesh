@@ -48,8 +48,18 @@
 		};
 		window.addEventListener('resize', handleResize);
 
+		const preventTouchZoom = (e: TouchEvent) => {
+			if (e.touches.length > 1) {
+				e.preventDefault();
+			}
+		};
+		overlayCanvas.addEventListener('touchstart', preventTouchZoom, { passive: false });
+		overlayCanvas.addEventListener('touchmove', preventTouchZoom, { passive: false });
+
 		return () => {
 			window.removeEventListener('resize', handleResize);
+			overlayCanvas.removeEventListener('touchstart', preventTouchZoom);
+			overlayCanvas.removeEventListener('touchmove', preventTouchZoom);
 		};
 	});
 
@@ -80,7 +90,7 @@
 		} catch {
 			// Ignore if not captured
 		}
-		engine?.handlePointerUp();
+		engine?.handlePointerUp(e);
 	}
 
 	function handleWheel(e: WheelEvent) {
