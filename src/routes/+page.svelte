@@ -60,8 +60,20 @@
 </svelte:head>
 
 <main
-	class="flex min-h-screen w-full flex-col items-center justify-center bg-[#121214] p-6 text-[#f4f4f5]"
+	class="relative flex min-h-screen w-full flex-col items-center justify-center bg-[#121214] p-6 text-[#f4f4f5]"
 >
+	<!-- GitHub stars badge, top-right corner -->
+	<a
+		href="https://github.com/VUXXE/Mesh"
+		target="_blank"
+		rel="noopener noreferrer"
+		class="fixed top-4 right-4 z-20 transition-opacity hover:opacity-80"
+	>
+		<img
+			src="https://img.shields.io/github/stars/VUXXE/Mesh?style=flat-square&logo=github&logoColor=white&label=Stars"
+			alt="GitHub stars"
+		/>
+	</a>
 	<div class="w-full max-w-md rounded-2xl border border-[#27272a] bg-[#18181b] p-8 shadow-2xl">
 		<!-- Brand & Logo -->
 		<div class="mb-6 flex items-center gap-3">
@@ -78,18 +90,6 @@
 
 		<!-- GitHub repo badges -->
 		<div class="mb-6 flex flex-wrap items-center gap-1.5">
-			<a
-				href="https://github.com/VUXXE/Mesh"
-				target="_blank"
-				rel="noopener noreferrer"
-				class="transition-opacity hover:opacity-80"
-			>
-				<img
-					src="https://img.shields.io/github/stars/VUXXE/Mesh?style=flat-square&logo=github&logoColor=white&label=Stars"
-					alt="GitHub stars"
-					loading="lazy"
-				/>
-			</a>
 			<a
 				href="https://github.com/VUXXE/Mesh/fork"
 				target="_blank"
