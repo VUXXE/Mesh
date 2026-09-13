@@ -22,6 +22,12 @@
 			"new_sqlite_classes": ["WhiteboardRoom"]
 		}
 	],
+	"observability": {
+		"logs": {
+			"enabled": false,
+			"invocation_logs": true
+		}
+	},
 	"workers_dev": true,
 	"preview_urls": true
 }
