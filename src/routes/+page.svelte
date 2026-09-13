@@ -51,7 +51,9 @@
 	<div class="w-full max-w-md rounded-2xl border border-[#27272a] bg-[#18181b] p-8 shadow-2xl">
 		<!-- Brand & Logo -->
 		<div class="mb-6 flex items-center gap-3">
-			<div class="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[#27272a] shadow-md">
+			<div
+				class="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[#27272a] shadow-md"
+			>
 				<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
 			</div>
 			<div>

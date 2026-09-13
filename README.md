@@ -62,3 +62,46 @@ bun run scripts/test-handshake.ts
 bun run scripts/test-sync-and-presence.ts
 bun run scripts/test-e2e.ts
 ```
+
+## Self-Hosting with Docker
+
+Mesh can be completely self-hosted on any VPS, home server, or local machine with Docker. Embedded SQLite databases and real-time collaboration work out of the box with zero external database dependencies.
+
+### Quick Start with Docker Compose
+
+```bash
+# Clone the repository
+git clone https://github.com/VUXXE/Mesh.git
+cd Mesh
+
+# Start the whiteboard service
+docker compose up -d
+```
+
+Once running, visit `http://localhost:4173` to create and share rooms.
+
+### Persistent Storage
+
+All rooms, vector shapes, and SQLite data are persisted in the named volume `mesh_data` mapped to `/data` in the container. Whiteboard data is safely preserved across container restarts and image updates.
+
+### Run with Docker CLI
+
+```bash
+# Build the image
+docker build -t mesh .
+
+# Run with persistent volume
+docker run -d \
+  --name mesh-whiteboard \
+  --restart unless-stopped \
+  -p 4173:4173 \
+  -v mesh_data:/data \
+  mesh
+```
+
+### Configuration Options
+
+| Variable      | Default | Description                                          |
+| :------------ | :------ | :--------------------------------------------------- |
+| `PORT`        | `4173`  | Listening port for the application                   |
+| `PERSIST_DIR` | `/data` | Persistence path for SQLite databases and room state |

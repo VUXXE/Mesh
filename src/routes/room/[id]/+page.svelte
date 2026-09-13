@@ -147,7 +147,9 @@
 		<div
 			class="max-w-sm rounded-2xl border border-[#27272a] bg-[#18181b] p-6 text-center shadow-xl"
 		>
-			<div class="mx-auto mb-4 h-12 w-12 overflow-hidden rounded-xl border border-[#27272a] shadow-md">
+			<div
+				class="mx-auto mb-4 h-12 w-12 overflow-hidden rounded-xl border border-[#27272a] shadow-md"
+			>
 				<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
 			</div>
 			<p class="mb-2 font-semibold text-rose-400">Invalid Room ID</p>
@@ -167,7 +169,7 @@
 		<!-- Top Left Brand / Return Home -->
 		<a
 			href="/"
-			class="group fixed top-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-[#27272a] bg-[#18181b]/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md transition-colors hover:border-[#3f3f46] hover:bg-[#27272a] select-none"
+			class="group fixed top-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-[#27272a] bg-[#18181b]/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md transition-colors select-none hover:border-[#3f3f46] hover:bg-[#27272a]"
 			title="Back to Mesh Home"
 		>
 			<img

@@ -381,7 +381,13 @@
 				title="Export or Import whiteboard"
 				aria-label="Export or Import whiteboard"
 			>
-				<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					class="h-3.5 w-3.5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 					<polyline points="7 10 12 15 17 10" />
 					<line x1="12" y1="15" x2="12" y2="3" />
@@ -392,7 +398,7 @@
 			<!-- Export Popover Menu -->
 			{#if showExportMenu}
 				<div
-					class="absolute bottom-full mb-3 right-0 z-30 w-48 rounded-xl border border-[#27272a] bg-[#18181b] p-1.5 shadow-2xl backdrop-blur-md"
+					class="absolute right-0 bottom-full z-30 mb-3 w-48 rounded-xl border border-[#27272a] bg-[#18181b] p-1.5 shadow-2xl backdrop-blur-md"
 				>
 					<div class="px-2 py-1 text-[10px] font-semibold tracking-wider text-[#71717a] uppercase">
 						Export
@@ -428,7 +434,13 @@
 						onclick={triggerImport}
 						class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-[#f4f4f5] transition-colors hover:bg-[#27272a]"
 					>
-						<svg class="h-3.5 w-3.5 text-[#f59e0b]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+						<svg
+							class="h-3.5 w-3.5 text-[#f59e0b]"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
 							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
 							<polyline points="17 8 12 3 7 8" />
 							<line x1="12" y1="3" x2="12" y2="15" />
