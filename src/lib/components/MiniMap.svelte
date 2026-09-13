@@ -16,10 +16,32 @@
 	const MM_WIDTH = 180;
 	const MM_HEIGHT = 110;
 
+	let rafId = 0;
+
+	function scheduleDraw() {
+		if (rafId !== 0 || isCollapsed) return;
+		rafId = requestAnimationFrame(() => {
+			rafId = 0;
+			drawMinimap();
+		});
+	}
+
 	$effect(() => {
 		if (canvasEl && shapes && !isCollapsed) {
-			drawMinimap();
+			scheduleDraw();
 		}
+	});
+
+	$effect(() => {
+		if (!engine) return;
+		const unsub = engine.addViewportListener(() => scheduleDraw());
+		return () => {
+			unsub();
+			if (rafId !== 0) {
+				cancelAnimationFrame(rafId);
+				rafId = 0;
+			}
+		};
 	});
 
 	function drawMinimap() {
@@ -31,14 +53,16 @@
 
 		if (shapes.size === 0) return;
 
-		// Calculate total bounding box of all shapes
+		// Calculate total bounding box of all shapes (single pass)
 		let minX = -1000;
 		let minY = -1000;
 		let maxX = 1000;
 		let maxY = 1000;
 
+		const boundsList: { minX: number; minY: number; width: number; height: number }[] = [];
 		for (const shape of shapes.values()) {
 			const b = getShapeBounds(shape);
+			boundsList.push(b);
 			if (b.minX < minX) minX = b.minX;
 			if (b.minY < minY) minY = b.minY;
 			if (b.maxX > maxX) maxX = b.maxX;
@@ -71,8 +95,7 @@
 
 		// Draw shapes
 		ctx.fillStyle = '#71717a'; // zinc-500
-		for (const shape of shapes.values()) {
-			const b = getShapeBounds(shape);
+		for (const b of boundsList) {
 			const x = b.minX * scale + offsetX;
 			const y = b.minY * scale + offsetY;
 			const w = Math.max(b.width * scale, 2);
