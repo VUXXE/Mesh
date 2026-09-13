@@ -1,9 +1,8 @@
 name: Deploy to Cloudflare Workers
 
+# Disabled: deploys are handled directly from the Cloudflare dashboard.
+# Kept for manual runs only via the Actions tab.
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
 jobs:
