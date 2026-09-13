@@ -244,22 +244,13 @@
 		</div>
 
 		<!-- Footer -->
-		<div
-			class="mt-8 flex items-center justify-between border-t border-(--surface-2) pt-6 text-[11px] text-(--ink-3)"
-		>
-			<div class="flex items-center gap-2">
-				<span>Made by</span>
-				<img src="/made-by-white.svg" alt="Made by" class="madeby-dark h-5 w-auto" />
-				<img src="/made-by-black.svg" alt="Made by" class="madeby-light h-5 w-auto" />
-			</div>
+		<div class="mt-8 border-t border-(--surface-2) pt-6 text-center text-[11px] text-(--ink-3)">
 			<a
 				href="https://github.com/VUXXE/Mesh"
 				target="_blank"
 				rel="noopener noreferrer"
-				class="transition-colors hover:text-(--ink-1)"
+				class="transition-colors hover:text-(--ink-1)">Open source (MIT)</a
 			>
-				Open source (MIT)
-			</a>
 		</div>
 	</div>
 </main>
@@ -268,14 +259,5 @@
 	.landing-dots {
 		background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1px);
 		background-size: 28px 28px;
-	}
-	.madeby-light {
-		display: none;
-	}
-	:global(html.light) .madeby-light {
-		display: block;
-	}
-	:global(html.light) .madeby-dark {
-		display: none;
 	}
 </style>
