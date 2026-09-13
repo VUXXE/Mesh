@@ -39,12 +39,20 @@
 		const isSticky = editingShape.type === 'sticky_note';
 		const x = viewport.panX + editingShape.x * viewport.zoom;
 		const y = viewport.panY + editingShape.y * viewport.zoom;
-		const width = editingShape.width * viewport.zoom;
-		const height = editingShape.height * viewport.zoom;
+		let width = editingShape.width * viewport.zoom;
+		let height = editingShape.height * viewport.zoom;
 		const fontSize = isSticky
 			? Math.max(14 * viewport.zoom, 10)
 			: Math.max((editingShape.data?.fontSize || 18) * viewport.zoom, 12);
-		const padding = isSticky ? Math.max(12 * viewport.zoom, 8) : 4;
+		const padding = isSticky ? Math.max(12 * viewport.zoom, 8) : 6;
+
+		if (!isSticky) {
+			const lines = editText.split('\n');
+			const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
+			const computedWidth = (maxLineLength + 2) * fontSize * 0.65;
+			width = Math.max(width, computedWidth, 140 * viewport.zoom);
+			height = Math.max(height, lines.length * fontSize * 1.4 + 12, 36 * viewport.zoom);
+		}
 
 		return {
 			x,
@@ -55,7 +63,7 @@
 			padding,
 			isSticky,
 			color: isSticky ? '#18181b' : editingShape.stroke || '#f4f4f5',
-			bg: isSticky ? '#fef08a' : 'rgba(24, 24, 27, 0.85)',
+			bg: isSticky ? '#fef08a' : 'rgba(24, 24, 27, 0.9)',
 			borderColor: isSticky ? '#eab308' : '#6366f1'
 		};
 	});
@@ -257,9 +265,11 @@
 			)}px; height: {Math.max(
 				editBox.height,
 				editBox.isSticky ? 80 : 32
-			)}px; font-size: {editBox.fontSize}px; padding: {editBox.padding}px; color: {editBox.color}; background: {editBox.bg}; border: 1px solid {editBox.borderColor}; border-radius: {editBox.isSticky
+			)}px; font-size: {editBox.fontSize}px; padding: {editBox.padding}px; color: {editBox.color}; caret-color: {editBox.isSticky
+				? '#18181b'
+				: '#6366f1'}; background: {editBox.bg}; border: 1px solid {editBox.borderColor}; border-radius: {editBox.isSticky
 				? '6px'
-				: '4px'}; line-height: 1.3; font-family: system-ui, -apple-system, sans-serif; resize: none; z-index: 30; outline: none; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);"
+				: '4px'}; line-height: 1.3; font-family: system-ui, -apple-system, sans-serif; resize: none; z-index: 30; outline: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
 			class="overflow-auto select-text"></textarea>
 	{/if}
 
