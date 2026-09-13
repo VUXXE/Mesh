@@ -67,6 +67,14 @@
 				engine?.deleteSelected();
 			} else if (e.key === 'Escape') {
 				engine?.setTool('select');
+			} else if (e.key === 'Enter') {
+				if (selectedIds.length === 1) {
+					const shape = engine?.getShape(selectedIds[0]);
+					if (shape && (shape.type === 'sticky_note' || shape.type === 'text')) {
+						e.preventDefault();
+						engine?.startTextEdit(shape);
+					}
+				}
 			}
 		};
 
