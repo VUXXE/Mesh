@@ -253,8 +253,7 @@
 				href="https://github.com/VUXXE/Mesh"
 				target="_blank"
 				rel="noopener noreferrer"
-				class="transition-colors hover:text-(--ink-1)"
-				>Open source (MIT)</a
+				class="transition-colors hover:text-(--ink-1)">Open source (MIT)</a
 			>
 		</div>
 	</div>
