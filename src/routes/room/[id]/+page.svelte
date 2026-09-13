@@ -5,6 +5,7 @@
 	import MiniMap from '$lib/components/MiniMap.svelte';
 	import PresenceBar from '$lib/components/PresenceBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
+	import logo from '$lib/assets/logo.png';
 	import { CanvasEngine } from '$lib/client/canvas-engine';
 	import { RoomSocket } from '$lib/client/websocket.svelte';
 	import { HistoryManager, type HistoryAction } from '$lib/client/history.svelte';
@@ -146,6 +147,9 @@
 		<div
 			class="max-w-sm rounded-2xl border border-[#27272a] bg-[#18181b] p-6 text-center shadow-xl"
 		>
+			<div class="mx-auto mb-4 h-12 w-12 overflow-hidden rounded-xl border border-[#27272a] shadow-md">
+				<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
+			</div>
 			<p class="mb-2 font-semibold text-rose-400">Invalid Room ID</p>
 			<p class="mb-4 text-xs text-[#a1a1aa]">
 				Room IDs must consist of 3-64 alphanumeric characters, underscores, or hyphens.
@@ -160,6 +164,20 @@
 	</div>
 {:else if socket}
 	<div class="relative h-screen w-screen overflow-hidden bg-[#121214]">
+		<!-- Top Left Brand / Return Home -->
+		<a
+			href="/"
+			class="group fixed top-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-[#27272a] bg-[#18181b]/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md transition-colors hover:border-[#3f3f46] hover:bg-[#27272a] select-none"
+			title="Back to Mesh Home"
+		>
+			<img
+				src={logo}
+				alt="Mesh Logo"
+				class="h-5 w-5 rounded-md object-cover shadow-sm transition-transform group-hover:scale-105"
+			/>
+			<span class="text-xs font-semibold tracking-tight text-[#f4f4f5]">Mesh</span>
+		</a>
+
 		<!-- Top Presence & Room Header -->
 		<PresenceBar
 			{roomId}
