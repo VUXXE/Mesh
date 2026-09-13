@@ -1,13 +1,39 @@
 @import 'tailwindcss';
 
+:root {
+	--surface-0: #121214;
+	--surface-1: #18181b;
+	--surface-2: #27272a;
+	--surface-3: #3f3f46;
+	--ink-1: #f4f4f5;
+	--ink-2: #a1a1aa;
+	--ink-3: #71717a;
+	--ink-disabled: #52525b;
+	--grid-dot: #27272a;
+	--canvas-bg: #121214;
+}
+
+html.light {
+	--surface-0: #fafafa;
+	--surface-1: #ffffff;
+	--surface-2: #e4e4e7;
+	--surface-3: #d4d4d8;
+	--ink-1: #18181b;
+	--ink-2: #52525b;
+	--ink-3: #71717a;
+	--ink-disabled: #a1a1aa;
+	--grid-dot: #d4d4d8;
+	--canvas-bg: #fafafa;
+}
+
 @layer base {
 	html,
 	body {
 		height: 100%;
 		width: 100%;
 		overflow: hidden;
-		background-color: #121214;
-		color: #f4f4f5;
+		background-color: var(--surface-0);
+		color: var(--ink-1);
 		font-family:
 			system-ui,
 			-apple-system,
