@@ -963,14 +963,18 @@ export class CanvasEngine {
 			}
 		} else if (shape.type === 'rectangle') {
 			ctx.beginPath();
-			ctx.roundRect(shape.x, shape.y, shape.width, shape.height, 4);
+			const rx = Math.min(shape.x, shape.x + shape.width);
+			const ry = Math.min(shape.y, shape.y + shape.height);
+			const rw = Math.max(Math.abs(shape.width), 1);
+			const rh = Math.max(Math.abs(shape.height), 1);
+			ctx.roundRect(rx, ry, rw, rh, 4);
 			if (shape.fill && shape.fill !== 'transparent') ctx.fill();
 			ctx.stroke();
 		} else if (shape.type === 'ellipse') {
 			ctx.beginPath();
-			const rx = Math.abs(shape.width / 2);
-			const ry = Math.abs(shape.height / 2);
-			ctx.ellipse(shape.x + rx, shape.y + ry, rx, ry, 0, 0, Math.PI * 2);
+			const rx = Math.max(Math.abs(shape.width / 2), 1);
+			const ry = Math.max(Math.abs(shape.height / 2), 1);
+			ctx.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, rx, ry, 0, 0, Math.PI * 2);
 			if (shape.fill && shape.fill !== 'transparent') ctx.fill();
 			ctx.stroke();
 		} else if (shape.type === 'text') {
@@ -1045,9 +1049,28 @@ export class CanvasEngine {
 	// EXPORT UTILITIES (PRD §10 Phase 4)
 	// -------------------------------------------------------------
 
+	private triggerBrowserDownload(source: string | Blob, filename: string) {
+		const isBlob = typeof source !== 'string';
+		const url = isBlob ? URL.createObjectURL(source) : source;
+		const a = document.createElement('a');
+		a.style.display = 'none';
+		a.href = url;
+		a.download = filename;
+		document.body.appendChild(a);
+		a.click();
+		setTimeout(() => {
+			if (document.body.contains(a)) {
+				document.body.removeChild(a);
+			}
+			if (isBlob) {
+				URL.revokeObjectURL(url);
+			}
+		}, 300);
+	}
+
 	exportToPng(filename = 'mesh-whiteboard.png', scale = 2) {
 		if (this.shapes.size === 0) {
-			alert('Canvas is empty.');
+			alert('Canvas is empty. Draw something before exporting.');
 			return;
 		}
 
@@ -1066,12 +1089,12 @@ export class CanvasEngine {
 		}
 
 		const padding = 40;
-		const w = maxX - minX + padding * 2;
-		const h = maxY - minY + padding * 2;
+		const w = Math.max(maxX - minX + padding * 2, 100);
+		const h = Math.max(maxY - minY + padding * 2, 100);
 
 		const offscreen = document.createElement('canvas');
-		offscreen.width = w * scale;
-		offscreen.height = h * scale;
+		offscreen.width = Math.round(w * scale);
+		offscreen.height = Math.round(h * scale);
 		const offCtx = offscreen.getContext('2d');
 		if (!offCtx) return;
 
@@ -1089,15 +1112,12 @@ export class CanvasEngine {
 		}
 
 		const dataUrl = offscreen.toDataURL('image/png');
-		const a = document.createElement('a');
-		a.href = dataUrl;
-		a.download = filename;
-		a.click();
+		this.triggerBrowserDownload(dataUrl, filename);
 	}
 
 	exportToSvg(filename = 'mesh-whiteboard.svg') {
 		if (this.shapes.size === 0) {
-			alert('Canvas is empty.');
+			alert('Canvas is empty. Draw something before exporting.');
 			return;
 		}
 
@@ -1115,8 +1135,8 @@ export class CanvasEngine {
 		}
 
 		const padding = 40;
-		const w = maxX - minX + padding * 2;
-		const h = maxY - minY + padding * 2;
+		const w = Math.max(maxX - minX + padding * 2, 100);
+		const h = Math.max(maxY - minY + padding * 2, 100);
 
 		let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX - padding} ${minY - padding} ${w} ${h}" width="${w}" height="${h}">\n`;
 		svgContent += `<rect x="${minX - padding}" y="${minY - padding}" width="${w}" height="${h}" fill="#121214"/>\n`;
@@ -1143,11 +1163,17 @@ export class CanvasEngine {
 					}
 				}
 			} else if (shape.type === 'rectangle') {
-				svgContent += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="4" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
+				const rx = Math.min(shape.x, shape.x + shape.width);
+				const ry = Math.min(shape.y, shape.y + shape.height);
+				const rw = Math.max(Math.abs(shape.width), 1);
+				const rh = Math.max(Math.abs(shape.height), 1);
+				svgContent += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="4" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
 			} else if (shape.type === 'ellipse') {
-				const rx = shape.width / 2;
-				const ry = shape.height / 2;
-				svgContent += `<ellipse cx="${shape.x + rx}" cy="${shape.y + ry}" rx="${rx}" ry="${ry}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
+				const rx = Math.max(Math.abs(shape.width / 2), 1);
+				const ry = Math.max(Math.abs(shape.height / 2), 1);
+				const cx = shape.x + shape.width / 2;
+				const cy = shape.y + shape.height / 2;
+				svgContent += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
 			} else if (shape.type === 'text') {
 				const text = shape.data?.text || '';
 				const fSize = shape.data?.fontSize || 18;
@@ -1163,18 +1189,13 @@ export class CanvasEngine {
 
 		svgContent += `</svg>`;
 
-		const blob = new Blob([svgContent], { type: 'image/svg+xml' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
+		const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
+		this.triggerBrowserDownload(blob, filename);
 	}
 
 	exportToJson(filename = 'mesh-whiteboard.json') {
 		if (this.shapes.size === 0) {
-			alert('Canvas is empty.');
+			alert('Canvas is empty. Draw something before exporting.');
 			return;
 		}
 
@@ -1185,13 +1206,10 @@ export class CanvasEngine {
 			shapes: Array.from(this.shapes.values())
 		};
 
-		const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const a = document.createElement('a');
-		a.href = url;
-		a.download = filename;
-		a.click();
-		URL.revokeObjectURL(url);
+		const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+			type: 'application/json;charset=utf-8'
+		});
+		this.triggerBrowserDownload(blob, filename);
 	}
 
 	importFromJson(jsonString: string): ShapeRecord[] | null {

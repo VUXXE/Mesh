@@ -77,13 +77,17 @@ export function getShapeBounds(shape: ShapeRecord): BoundingBox {
 	if (shape.type === 'path') {
 		const points: PathPoint[] = shape.data?.points ?? [];
 		if (points.length === 0) {
+			const minX = Math.min(shape.x, shape.x + shape.width);
+			const minY = Math.min(shape.y, shape.y + shape.height);
+			const maxX = Math.max(shape.x, shape.x + shape.width);
+			const maxY = Math.max(shape.y, shape.y + shape.height);
 			return {
-				minX: shape.x,
-				minY: shape.y,
-				maxX: shape.x + shape.width,
-				maxY: shape.y + shape.height,
-				width: shape.width,
-				height: shape.height
+				minX,
+				minY,
+				maxX,
+				maxY,
+				width: Math.max(maxX - minX, 1),
+				height: Math.max(maxY - minY, 1)
 			};
 		}
 
@@ -110,18 +114,18 @@ export function getShapeBounds(shape: ShapeRecord): BoundingBox {
 		};
 	}
 
-	const minX = shape.x;
-	const minY = shape.y;
-	const maxX = shape.x + shape.width;
-	const maxY = shape.y + shape.height;
+	const minX = Math.min(shape.x, shape.x + shape.width);
+	const minY = Math.min(shape.y, shape.y + shape.height);
+	const maxX = Math.max(shape.x, shape.x + shape.width);
+	const maxY = Math.max(shape.y, shape.y + shape.height);
 
 	return {
 		minX,
 		minY,
 		maxX,
 		maxY,
-		width: Math.abs(shape.width),
-		height: Math.abs(shape.height)
+		width: Math.max(maxX - minX, 1),
+		height: Math.max(maxY - minY, 1)
 	};
 }
 
