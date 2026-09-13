@@ -100,7 +100,7 @@
 </script>
 
 <div
-	class="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-[#27272a] bg-[#18181b] px-2.5 py-2 shadow-2xl backdrop-blur-md select-none"
+	class="fixed bottom-6 left-1/2 z-20 flex max-w-[95vw] -translate-x-1/2 items-center gap-1.5 overflow-x-auto rounded-xl border border-[#27272a] bg-[#18181b] px-2.5 py-2 shadow-2xl backdrop-blur-md select-none"
 >
 	<!-- Undo / Redo Group -->
 	<div class="flex items-center gap-0.5">
