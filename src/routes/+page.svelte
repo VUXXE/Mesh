@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import logo from '$lib/assets/logo.png';
 
 	let joinRoomId = $state('');
 	let errorMessage = $state('');
@@ -50,18 +51,8 @@
 	<div class="w-full max-w-md rounded-2xl border border-[#27272a] bg-[#18181b] p-8 shadow-2xl">
 		<!-- Brand & Logo -->
 		<div class="mb-6 flex items-center gap-3">
-			<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6366f1] shadow-md">
-				<svg
-					class="h-5 w-5 text-white"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2.5"
-				>
-					<path d="M12 19l7-7 3 3-7 7-3-3z" />
-					<path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
-					<path d="M2 2l7.586 7.586" />
-				</svg>
+			<div class="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[#27272a] shadow-md">
+				<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
 			</div>
 			<div>
 				<h1 class="text-xl font-bold tracking-tight text-[#f4f4f5]">Mesh</h1>
