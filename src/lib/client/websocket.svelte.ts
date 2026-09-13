@@ -23,11 +23,15 @@ export class RoomSocket {
 	private pendingPresenceTimer: ReturnType<typeof setTimeout> | null = null;
 	private pendingCursor: { x: number; y: number } | null = null;
 	private pendingSelectedIds: string[] = [];
+	private pendingPassword: string | null = null;
 
 	// Svelte 5 reactive states
 	status = $state<ConnectionStatus>('connecting');
 	shapes = $state<Map<string, ShapeRecord>>(new Map());
 	peers = $state<PeerPresence[]>([]);
+	authRequired = $state(false);
+	authed = $state(false);
+	authError = $state('');
 	currentUser = $state<CurrentUser>({
 		userId: '',
 		name: 'Collaborator',
@@ -38,6 +42,50 @@ export class RoomSocket {
 		this.roomId = roomId;
 		this.initUser();
 		this.connect();
+	}
+
+	private passwordStorageKey(): string {
+		return `mesh_room_pw_${this.roomId}`;
+	}
+
+	private getStoredPassword(): string | null {
+		if (typeof window === 'undefined') return null;
+		try {
+			return sessionStorage.getItem(this.passwordStorageKey());
+		} catch {
+			return null;
+		}
+	}
+
+	private storePassword(password: string): void {
+		if (typeof window === 'undefined') return;
+		try {
+			sessionStorage.setItem(this.passwordStorageKey(), password);
+		} catch {
+			// Ignore storage errors (private mode, etc.)
+		}
+	}
+
+	authenticate(password: string): void {
+		this.authError = '';
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			this.authError = 'Not connected. Please wait and try again.';
+			return;
+		}
+		this.pendingPassword = password;
+		const msg: C2SMessage = { type: 'room:auth', password };
+		this.ws.send(JSON.stringify(msg));
+	}
+
+	setRoomPassword(password: string): void {
+		this.authError = '';
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			this.authError = 'Not connected. Please wait and try again.';
+			return;
+		}
+		this.pendingPassword = password;
+		const msg: C2SMessage = { type: 'room:set_password', password };
+		this.ws.send(JSON.stringify(msg));
 	}
 
 	private initUser() {
@@ -109,6 +157,12 @@ export class RoomSocket {
 		this.ws.onopen = () => {
 			this.status = 'connected';
 			this.reconnectAttempt = 0;
+			// Auto re-authenticate on (re)connect if we have a stored password
+			const stored = this.getStoredPassword();
+			if (stored) {
+				const msg: C2SMessage = { type: 'room:auth', password: stored };
+				this.ws?.send(JSON.stringify(msg));
+			}
 			// Immediately broadcast our initial presence
 			this.sendPresenceImmediate(this.pendingCursor, this.pendingSelectedIds);
 		};
@@ -156,6 +210,14 @@ export class RoomSocket {
 
 		switch (msg.type) {
 			case 'sync:init': {
+				const locked = msg.requiresPassword === true;
+				this.authRequired = locked;
+				if (locked && !this.authed) {
+					// Locked room: wait for auth before accepting content
+					this.shapes = new Map();
+					this.peers = [];
+					break;
+				}
 				const map = new Map<string, ShapeRecord>();
 				for (const s of msg.shapes) {
 					map.set(s.id, s);
@@ -164,6 +226,34 @@ export class RoomSocket {
 
 				// Update active peers, excluding ourselves
 				this.peers = msg.peers.filter((p) => p.userId !== this.currentUser.userId);
+				break;
+			}
+
+			case 'room:auth_ok': {
+				this.authed = true;
+				this.authError = '';
+				if (this.pendingPassword) {
+					this.storePassword(this.pendingPassword);
+					this.pendingPassword = null;
+				}
+				break;
+			}
+
+			case 'room:auth_failed': {
+				this.authed = false;
+				this.pendingPassword = null;
+				this.authError = 'Incorrect password. Please try again.';
+				break;
+			}
+
+			case 'room:password_set': {
+				this.authRequired = true;
+				this.authed = true;
+				this.authError = '';
+				if (this.pendingPassword) {
+					this.storePassword(this.pendingPassword);
+					this.pendingPassword = null;
+				}
 				break;
 			}
 
@@ -262,6 +352,7 @@ export class RoomSocket {
 	 */
 	upsertShapes(shapes: ShapeRecord[]) {
 		if (shapes.length === 0) return;
+		if (this.authRequired && !this.authed) return;
 
 		// Optimistic local update
 		const next = new Map(this.shapes);
@@ -299,6 +390,7 @@ export class RoomSocket {
 	 */
 	deleteShapes(ids: string[]) {
 		if (ids.length === 0) return;
+		if (this.authRequired && !this.authed) return;
 
 		// Optimistic local removal
 		const next = new Map(this.shapes);
@@ -321,6 +413,7 @@ export class RoomSocket {
 	 * Clears entire canvas locally and broadcasts purge to the server.
 	 */
 	clearCanvas() {
+		if (this.authRequired && !this.authed) return;
 		this.shapes = new Map();
 
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;

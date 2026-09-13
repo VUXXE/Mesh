@@ -57,6 +57,14 @@ export type C2SMessage =
 			selectedIds: string[];
 	  }
 	| {
+			type: 'room:auth';
+			password: string;
+	  }
+	| {
+			type: 'room:set_password';
+			password: string;
+	  }
+	| {
 			type: 'shape:upsert';
 			shapes: Array<{
 				id: string;
@@ -89,6 +97,16 @@ export type S2CMessage =
 			serverTime: number;
 			shapes: ShapeRecord[];
 			peers: PeerPresence[];
+			requiresPassword?: boolean;
+	  }
+	| {
+			type: 'room:auth_ok';
+	  }
+	| {
+			type: 'room:auth_failed';
+	  }
+	| {
+			type: 'room:password_set';
 	  }
 	| {
 			type: 'presence:peer';

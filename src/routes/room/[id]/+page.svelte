@@ -17,6 +17,8 @@
 	let socket = $state<RoomSocket | null>(null);
 	let engine = $state<CanvasEngine | null>(null);
 	let selectedIds = $state<string[]>([]);
+	let authPassword = $state('');
+	let passwordClaimed = false;
 	const history = new HistoryManager();
 
 	onMount(() => {
@@ -142,6 +144,25 @@
 			socket?.clearCanvas();
 		}
 	}
+
+	// Claim a password stashed by the landing page and set it once connected
+	$effect(() => {
+		if (passwordClaimed || !socket || socket.status !== 'connected') return;
+		let pending: string | null = null;
+		try {
+			pending = sessionStorage.getItem(`mesh_new_room_pw_${roomId}`);
+			if (pending) sessionStorage.removeItem(`mesh_new_room_pw_${roomId}`);
+		} catch {
+			// Ignore storage errors (private mode, etc.)
+		}
+		passwordClaimed = true;
+		if (pending) socket.setRoomPassword(pending);
+	});
+
+	function handleAuthSubmit(e: Event) {
+		e.preventDefault();
+		socket?.authenticate(authPassword);
+	}
 </script>
 
 <svelte:head>
@@ -194,6 +215,7 @@
 			status={socket.status}
 			currentUser={socket.currentUser}
 			peers={socket.peers}
+			locked={socket.authRequired}
 			onUpdateUserName={handleUpdateUserName}
 		/>
 
@@ -232,5 +254,51 @@
 
 		<!-- Bottom-Right Radar Minimap -->
 		<MiniMap {engine} shapes={socket.shapes} />
+
+		<!-- Password Gate -->
+		{#if socket.authRequired && !socket.authed}
+			<div
+				class="fixed inset-0 z-40 flex items-center justify-center bg-[#121214]/80 p-6 backdrop-blur-sm"
+			>
+				<div
+					class="w-full max-w-sm rounded-2xl border border-[#27272a] bg-[#18181b] p-6 text-center shadow-2xl"
+				>
+					<div
+						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-[#27272a] bg-[#121214]"
+					>
+						<svg
+							class="h-5 w-5 text-[#a1a1aa]"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<rect x="3" y="11" width="18" height="11" rx="2" />
+							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+						</svg>
+					</div>
+					<p class="mb-1 font-semibold text-[#f4f4f5]">This room is locked</p>
+					<p class="mb-4 text-xs text-[#a1a1aa]">Enter the room password to join.</p>
+					<form onsubmit={handleAuthSubmit} class="space-y-2">
+						<input
+							type="password"
+							bind:value={authPassword}
+							placeholder="Room password"
+							autocomplete="current-password"
+							class="w-full rounded-xl border border-[#27272a] bg-[#121214] px-3.5 py-2.5 text-sm text-[#f4f4f5] placeholder-[#71717a] transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+						/>
+						{#if socket.authError}
+							<p class="text-xs text-rose-400">{socket.authError}</p>
+						{/if}
+						<button
+							type="submit"
+							class="w-full rounded-xl bg-[#6366f1] px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#4f46e5] focus:outline-none"
+						>
+							Unlock Room
+						</button>
+					</form>
+				</div>
+			</div>
+		{/if}
 	</div>
 {/if}

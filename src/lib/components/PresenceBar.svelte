@@ -7,10 +7,11 @@
 		status: ConnectionStatus;
 		currentUser: CurrentUser;
 		peers: PeerPresence[];
+		locked?: boolean;
 		onUpdateUserName: (name: string) => void;
 	}
 
-	let { roomId, status, currentUser, peers, onUpdateUserName }: Props = $props();
+	let { roomId, status, currentUser, peers, locked = false, onUpdateUserName }: Props = $props();
 
 	let copiedCode = $state(false);
 	let copiedLink = $state(false);
@@ -70,6 +71,19 @@
 		class="flex items-center gap-1.5 rounded-lg border border-[#27272a] bg-[#18181b] px-3 py-1.5 shadow-lg backdrop-blur-md"
 	>
 		<span class="text-xs text-[#a1a1aa]">Room:</span>
+		{#if locked}
+			<svg
+				class="h-3.5 w-3.5 text-amber-300"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+			>
+				<title>Password protected</title>
+				<rect x="3" y="11" width="18" height="11" rx="2" />
+				<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+			</svg>
+		{/if}
 		<button
 			onclick={copyRoomCode}
 			class="font-mono text-xs font-semibold text-[#f4f4f5] transition-colors hover:text-[#6366f1] focus:outline-none"
