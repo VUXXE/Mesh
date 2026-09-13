@@ -1,11 +1,17 @@
 import {
+	calculateResizedBounds,
+	getResizeCursor,
+	getResizeHandles,
 	getShapeBounds,
+	hitTestResizeHandles,
 	hitTestShape,
+	isResizableShape,
 	isShapeInsideMarquee,
 	screenToWorld,
 	simplifyRDP,
 	worldToScreen,
-	type BoundingBox
+	type BoundingBox,
+	type ResizeHandle
 } from './math';
 import type { PathPoint, PeerPresence, ShapeRecord, ShapeType } from '../types';
 import type { HistoryAction } from './history.svelte';
@@ -50,10 +56,14 @@ export class CanvasEngine {
 		| 'create_line'
 		| 'create_text'
 		| 'drag_selection'
+		| 'resize_shape'
 		| 'marquee'
 		| 'pan'
 		| 'pinch_zoom'
 		| null = null;
+	private activeResizeHandle: ResizeHandle | null = null;
+	private resizeInitialPointer: { x: number; y: number } = { x: 0, y: 0 };
+	private resizeInitialShape: ShapeRecord | null = null;
 	private startPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private currentPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private activePathPoints: PathPoint[] = [];
@@ -163,10 +173,46 @@ export class CanvasEngine {
 			this.selectedIds = [];
 			this.onSelectionChanged?.(this.selectedIds);
 		}
+		this.overlayCanvas.style.cursor = '';
 		this.renderOverlay();
 		this.onToolChanged?.(tool);
 		for (const fn of this.toolChangedListeners) {
 			fn(tool);
+		}
+	}
+
+	handlePointerLeave() {
+		if (!this.isInteracting) {
+			this.overlayCanvas.style.cursor = '';
+			this.onCursorMoved?.(null);
+		}
+	}
+
+	private updateHoverCursor(screenPos: { x: number; y: number }) {
+		if (this.tool !== 'select' || this.selectedIds.length !== 1 || this.editingShapeId !== null) {
+			this.overlayCanvas.style.cursor = '';
+			return;
+		}
+
+		const selectedShape = this.shapes.get(this.selectedIds[0]);
+		if (!selectedShape || !isResizableShape(selectedShape.type)) {
+			this.overlayCanvas.style.cursor = '';
+			return;
+		}
+
+		const bounds = getShapeBounds(selectedShape);
+		const hitHandle = hitTestResizeHandles(
+			screenPos,
+			bounds,
+			this.viewport.panX,
+			this.viewport.panY,
+			this.viewport.zoom
+		);
+
+		if (hitHandle) {
+			this.overlayCanvas.style.cursor = getResizeCursor(hitHandle);
+		} else {
+			this.overlayCanvas.style.cursor = '';
 		}
 	}
 
@@ -336,6 +382,37 @@ export class CanvasEngine {
 		}
 
 		if (this.tool === 'select') {
+			// Hit-test resize handles if single resizable shape is selected
+			if (this.selectedIds.length === 1) {
+				const selectedShape = this.shapes.get(this.selectedIds[0]);
+				if (
+					selectedShape &&
+					isResizableShape(selectedShape.type) &&
+					this.editingShapeId !== selectedShape.id
+				) {
+					const bounds = getShapeBounds(selectedShape);
+					const hitHandle = hitTestResizeHandles(
+						screenPos,
+						bounds,
+						this.viewport.panX,
+						this.viewport.panY,
+						this.viewport.zoom
+					);
+					if (hitHandle) {
+						this.interactionType = 'resize_shape';
+						this.activeResizeHandle = hitHandle;
+						this.resizeInitialPointer = { x: worldPos.x, y: worldPos.y };
+						this.resizeInitialShape = {
+							...selectedShape,
+							data: selectedShape.data ? { ...selectedShape.data } : undefined
+						};
+						this.overlayCanvas.style.cursor = getResizeCursor(hitHandle);
+						this.renderOverlay();
+						return;
+					}
+				}
+			}
+
 			// Hit-test shapes in reverse zIndex order (top-most first)
 			const sortedShapes = Array.from(this.shapes.values()).sort((a, b) => b.zIndex - a.zIndex);
 			const hit = sortedShapes.find((s) => hitTestShape(worldPos, s));
@@ -420,6 +497,52 @@ export class CanvasEngine {
 		this.onCursorMoved?.(worldPos);
 
 		if (!this.isInteracting) {
+			this.updateHoverCursor(screenPos);
+			this.renderOverlay();
+			return;
+		}
+
+		if (this.interactionType === 'resize_shape') {
+			if (!this.activeResizeHandle || !this.resizeInitialShape) return;
+			const shape = this.shapes.get(this.resizeInitialShape.id);
+			if (!shape) return;
+
+			this.overlayCanvas.style.cursor = getResizeCursor(this.activeResizeHandle);
+
+			const isShift = e.shiftKey || this.isShiftPressed;
+			const minW = shape.type === 'sticky_note' ? 80 : shape.type === 'text' ? 20 : 10;
+			const minH = shape.type === 'sticky_note' ? 80 : shape.type === 'text' ? 16 : 10;
+
+			const resized = calculateResizedBounds({
+				handle: this.activeResizeHandle,
+				initialBounds: {
+					x: this.resizeInitialShape.x,
+					y: this.resizeInitialShape.y,
+					width: this.resizeInitialShape.width,
+					height: this.resizeInitialShape.height
+				},
+				startPoint: this.resizeInitialPointer,
+				currentPoint: worldPos,
+				maintainAspectRatio: isShift,
+				minWidth: minW,
+				minHeight: minH
+			});
+
+			shape.x = resized.x;
+			shape.y = resized.y;
+			shape.width = resized.width;
+			shape.height = resized.height;
+
+			if (shape.type === 'text' && this.resizeInitialShape.height > 0) {
+				const scale = resized.height / this.resizeInitialShape.height;
+				const initialFontSize = this.resizeInitialShape.data?.fontSize || 18;
+				shape.data = {
+					...shape.data,
+					fontSize: Math.max(Math.round(initialFontSize * scale), 8)
+				};
+			}
+
+			this.renderBuffer();
 			this.renderOverlay();
 			return;
 		}
@@ -657,6 +780,35 @@ export class CanvasEngine {
 			}
 			this.dragInitialPositions.clear();
 			this.dragInitialShapes.clear();
+		} else if (this.interactionType === 'resize_shape') {
+			if (this.resizeInitialShape && this.selectedIds.length === 1) {
+				const shape = this.shapes.get(this.selectedIds[0]);
+				const initial = this.resizeInitialShape;
+				if (
+					shape &&
+					(shape.x !== initial.x ||
+						shape.y !== initial.y ||
+						shape.width !== initial.width ||
+						shape.height !== initial.height ||
+						shape.data?.fontSize !== initial.data?.fontSize)
+				) {
+					shape.updatedAt = now;
+					const mutated = { ...shape };
+					this.onShapesMutated?.([mutated]);
+					this.onActionRecorded?.({
+						type: 'modify',
+						before: [initial],
+						after: [mutated]
+					});
+				}
+			}
+			this.resizeInitialShape = null;
+			this.activeResizeHandle = null;
+			if (e) {
+				this.updateHoverCursor({ x: e.clientX, y: e.clientY });
+			} else {
+				this.overlayCanvas.style.cursor = '';
+			}
 		}
 
 		this.isInteracting = false;
@@ -743,6 +895,7 @@ export class CanvasEngine {
 				shapes: [shape]
 			});
 		}
+		this.overlayCanvas.style.cursor = '';
 		this.renderBuffer();
 		this.renderOverlay();
 	}
@@ -750,6 +903,7 @@ export class CanvasEngine {
 	startTextEdit(shape: ShapeRecord) {
 		this.isInteracting = false;
 		this.interactionType = null;
+		this.overlayCanvas.style.cursor = 'default';
 		this.editingShapeId = shape.id;
 		this.renderBuffer();
 		this.renderOverlay();
@@ -760,6 +914,11 @@ export class CanvasEngine {
 		this.editingShapeId = null;
 		this.renderBuffer();
 		this.renderOverlay();
+		const evt = window.event as MouseEvent | undefined;
+		this.updateHoverCursor({
+			x: evt?.clientX ?? -1000,
+			y: evt?.clientY ?? -1000
+		});
 		this.onEndTextEdit?.();
 	}
 
@@ -969,6 +1128,11 @@ export class CanvasEngine {
 
 		// 3. Draw selection bounding box and handles
 		if (this.selectedIds.length > 0) {
+			const isSingleSelection = this.selectedIds.length === 1;
+			const singleShape = isSingleSelection ? this.shapes.get(this.selectedIds[0]) : null;
+			const canResizeSingle =
+				singleShape && isResizableShape(singleShape.type) && this.editingShapeId !== singleShape.id;
+
 			for (const id of this.selectedIds) {
 				const shape = this.shapes.get(id);
 				if (shape) {
@@ -977,9 +1141,35 @@ export class CanvasEngine {
 					ctx.strokeStyle = '#6366f1'; // Electric Indigo selection color
 					ctx.lineWidth = 1.5 / this.viewport.zoom;
 					ctx.setLineDash([4 / this.viewport.zoom, 4 / this.viewport.zoom]);
-					ctx.strokeRect(b.minX - 4, b.minY - 4, b.width + 8, b.height + 8);
+					if (canResizeSingle) {
+						ctx.strokeRect(b.minX, b.minY, b.width, b.height);
+					} else {
+						ctx.strokeRect(b.minX - 4, b.minY - 4, b.width + 8, b.height + 8);
+					}
 					ctx.restore();
 				}
+			}
+
+			// Draw 8 resize handles for single selected resizable shape
+			if (canResizeSingle && singleShape) {
+				const b = getShapeBounds(singleShape);
+				const handles = getResizeHandles(b);
+
+				const handleSize = 8 / this.viewport.zoom;
+				const halfSize = handleSize / 2;
+
+				ctx.save();
+				ctx.fillStyle = '#ffffff';
+				ctx.strokeStyle = '#6366f1';
+				ctx.lineWidth = 1.5 / this.viewport.zoom;
+				ctx.setLineDash([]); // solid border for handles
+
+				for (const pos of Object.values(handles)) {
+					ctx.beginPath();
+					ctx.fillRect(pos.x - halfSize, pos.y - halfSize, handleSize, handleSize);
+					ctx.strokeRect(pos.x - halfSize, pos.y - halfSize, handleSize, handleSize);
+				}
+				ctx.restore();
 			}
 		}
 

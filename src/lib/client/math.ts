@@ -1,4 +1,4 @@
-import type { PathPoint, ShapeRecord } from '../types';
+import type { PathPoint, ShapeRecord, ShapeType } from '../types';
 
 /**
  * Perpendicular distance from a point P to a line segment AB.
@@ -224,4 +224,201 @@ export function worldToScreen(
 		x: worldX * zoom + panX,
 		y: worldY * zoom + panY
 	};
+}
+
+export type ResizeHandle = 'nw' | 'ne' | 'se' | 'sw' | 'n' | 's' | 'e' | 'w';
+
+export function isResizableShape(type: ShapeType): boolean {
+	return type === 'rectangle' || type === 'ellipse' || type === 'sticky_note' || type === 'text';
+}
+
+export function getResizeHandles(
+	bounds: BoundingBox
+): Record<ResizeHandle, { x: number; y: number }> {
+	const midX = bounds.minX + bounds.width / 2;
+	const midY = bounds.minY + bounds.height / 2;
+
+	return {
+		nw: { x: bounds.minX, y: bounds.minY },
+		n: { x: midX, y: bounds.minY },
+		ne: { x: bounds.maxX, y: bounds.minY },
+		e: { x: bounds.maxX, y: midY },
+		se: { x: bounds.maxX, y: bounds.maxY },
+		s: { x: midX, y: bounds.maxY },
+		sw: { x: bounds.minX, y: bounds.maxY },
+		w: { x: bounds.minX, y: midY }
+	};
+}
+
+export function hitTestResizeHandles(
+	screenPos: { x: number; y: number },
+	bounds: BoundingBox,
+	panX: number,
+	panY: number,
+	zoom: number,
+	hitRadius = 8
+): ResizeHandle | null {
+	const handles = getResizeHandles(bounds);
+	const handleOrder: ResizeHandle[] = ['nw', 'ne', 'se', 'sw', 'n', 's', 'e', 'w'];
+
+	for (const handle of handleOrder) {
+		const pos = handles[handle];
+		const screenHandle = worldToScreen(pos.x, pos.y, panX, panY, zoom);
+		const dx = Math.abs(screenPos.x - screenHandle.x);
+		const dy = Math.abs(screenPos.y - screenHandle.y);
+		if (dx <= hitRadius && dy <= hitRadius) {
+			return handle;
+		}
+	}
+
+	return null;
+}
+
+export function getResizeCursor(handle: ResizeHandle): string {
+	switch (handle) {
+		case 'nw':
+		case 'se':
+			return 'nwse-resize';
+		case 'ne':
+		case 'sw':
+			return 'nesw-resize';
+		case 'n':
+		case 's':
+			return 'ns-resize';
+		case 'e':
+		case 'w':
+			return 'ew-resize';
+	}
+}
+
+export interface ResizeBoundsOptions {
+	handle: ResizeHandle;
+	initialBounds: { x: number; y: number; width: number; height: number };
+	startPoint: { x: number; y: number };
+	currentPoint: { x: number; y: number };
+	maintainAspectRatio: boolean;
+	minWidth?: number;
+	minHeight?: number;
+}
+
+export function calculateResizedBounds(options: ResizeBoundsOptions): {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+} {
+	const {
+		handle,
+		initialBounds: { x: x0, y: y0, width: w0, height: h0 },
+		startPoint,
+		currentPoint,
+		maintainAspectRatio,
+		minWidth = 10,
+		minHeight = 10
+	} = options;
+
+	const dx = currentPoint.x - startPoint.x;
+	const dy = currentPoint.y - startPoint.y;
+	const right0 = x0 + w0;
+	const bottom0 = y0 + h0;
+	const aspect = h0 > 0 ? w0 / h0 : 1;
+
+	if (!maintainAspectRatio) {
+		switch (handle) {
+			case 'se': {
+				const w = Math.max(minWidth, w0 + dx);
+				const h = Math.max(minHeight, h0 + dy);
+				return { x: x0, y: y0, width: w, height: h };
+			}
+			case 'sw': {
+				const w = Math.max(minWidth, w0 - dx);
+				const h = Math.max(minHeight, h0 + dy);
+				return { x: right0 - w, y: y0, width: w, height: h };
+			}
+			case 'ne': {
+				const w = Math.max(minWidth, w0 + dx);
+				const h = Math.max(minHeight, h0 - dy);
+				return { x: x0, y: bottom0 - h, width: w, height: h };
+			}
+			case 'nw': {
+				const w = Math.max(minWidth, w0 - dx);
+				const h = Math.max(minHeight, h0 - dy);
+				return { x: right0 - w, y: bottom0 - h, width: w, height: h };
+			}
+			case 'e': {
+				const w = Math.max(minWidth, w0 + dx);
+				return { x: x0, y: y0, width: w, height: h0 };
+			}
+			case 'w': {
+				const w = Math.max(minWidth, w0 - dx);
+				return { x: right0 - w, y: y0, width: w, height: h0 };
+			}
+			case 's': {
+				const h = Math.max(minHeight, h0 + dy);
+				return { x: x0, y: y0, width: w0, height: h };
+			}
+			case 'n': {
+				const h = Math.max(minHeight, h0 - dy);
+				return { x: x0, y: bottom0 - h, width: w0, height: h };
+			}
+		}
+	}
+
+	// Aspect ratio locked resizing
+	const minScale = Math.max(minWidth / w0, minHeight / h0);
+
+	switch (handle) {
+		case 'se': {
+			const len = Math.hypot(w0, h0);
+			const proj = (dx * w0 + dy * h0) / len;
+			const scale = Math.max((len + proj) / len, minScale);
+			const w = w0 * scale;
+			const h = h0 * scale;
+			return { x: x0, y: y0, width: w, height: h };
+		}
+		case 'nw': {
+			const len = Math.hypot(w0, h0);
+			const proj = (-dx * w0 - dy * h0) / len;
+			const scale = Math.max((len + proj) / len, minScale);
+			const w = w0 * scale;
+			const h = h0 * scale;
+			return { x: right0 - w, y: bottom0 - h, width: w, height: h };
+		}
+		case 'ne': {
+			const len = Math.hypot(w0, h0);
+			const proj = (dx * w0 - dy * h0) / len;
+			const scale = Math.max((len + proj) / len, minScale);
+			const w = w0 * scale;
+			const h = h0 * scale;
+			return { x: x0, y: bottom0 - h, width: w, height: h };
+		}
+		case 'sw': {
+			const len = Math.hypot(w0, h0);
+			const proj = (-dx * w0 + dy * h0) / len;
+			const scale = Math.max((len + proj) / len, minScale);
+			const w = w0 * scale;
+			const h = h0 * scale;
+			return { x: right0 - w, y: y0, width: w, height: h };
+		}
+		case 'e': {
+			const w = Math.max(minWidth, minHeight * aspect, w0 + dx);
+			const h = w / aspect;
+			return { x: x0, y: y0 - (h - h0) / 2, width: w, height: h };
+		}
+		case 'w': {
+			const w = Math.max(minWidth, minHeight * aspect, w0 - dx);
+			const h = w / aspect;
+			return { x: right0 - w, y: y0 - (h - h0) / 2, width: w, height: h };
+		}
+		case 's': {
+			const h = Math.max(minHeight, minWidth / aspect, h0 + dy);
+			const w = h * aspect;
+			return { x: x0 - (w - w0) / 2, y: y0, width: w, height: h };
+		}
+		case 'n': {
+			const h = Math.max(minHeight, minWidth / aspect, h0 - dy);
+			const w = h * aspect;
+			return { x: x0 - (w - w0) / 2, y: bottom0 - h, width: w, height: h };
+		}
+	}
 }
