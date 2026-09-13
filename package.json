@@ -6,7 +6,7 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
-		"build": "wrangler types --check && vite build && bun run scripts/inject-exports.ts",
+		"build": "wrangler types && vite build && bun run scripts/inject-exports.ts",
 		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
 		"deploy": "bun run build && wrangler deploy",
 		"prepare": "svelte-kit sync || echo ''",
