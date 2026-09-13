@@ -3,12 +3,12 @@
 // Runtime types generated with workerd@1.20260911.1 2026-09-13 nodejs_als
 interface __BaseEnv_Env {
 	ASSETS: Fetcher;
-	ROOMS: DurableObjectNamespace<import('./.svelte-kit/cloudflare/_worker').WhiteboardRoom>;
+	ROOMS: DurableObjectNamespace<import("./.svelte-kit/cloudflare/_worker").WhiteboardRoom>;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {
-		mainModule: typeof import('./.svelte-kit/cloudflare/_worker');
-		durableNamespaces: 'WhiteboardRoom';
+		mainModule: typeof import("./.svelte-kit/cloudflare/_worker");
+		durableNamespaces: "WhiteboardRoom";
 	}
 	interface Env extends __BaseEnv_Env {}
 }
