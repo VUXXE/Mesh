@@ -60,19 +60,21 @@
 </svelte:head>
 
 <main
-	class="flex min-h-screen w-full flex-col items-center justify-center bg-[#121214] p-6 text-[#f4f4f5]"
+	class="flex min-h-screen w-full flex-col items-center justify-center bg-(--surface-0) p-6 text-(--ink-1)"
 >
-	<div class="w-full max-w-md rounded-2xl border border-[#27272a] bg-[#18181b] p-8 shadow-2xl">
+	<div
+		class="w-full max-w-md rounded-2xl border border-(--surface-2) bg-(--surface-1) p-8 shadow-2xl"
+	>
 		<!-- Brand & Logo -->
 		<div class="mb-6 flex items-center gap-3">
 			<div
-				class="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-[#27272a] shadow-md"
+				class="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-(--surface-2) shadow-md"
 			>
 				<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
 			</div>
 			<div>
-				<h1 class="text-xl font-bold tracking-tight text-[#f4f4f5]">Mesh</h1>
-				<p class="text-xs text-[#a1a1aa]">Real-time collaborative vector whiteboard</p>
+				<h1 class="text-xl font-bold tracking-tight text-(--ink-1)">Mesh</h1>
+				<p class="text-xs text-(--ink-2)">Real-time collaborative vector whiteboard</p>
 			</div>
 		</div>
 
@@ -141,7 +143,7 @@
 					bind:value={roomPassword}
 					placeholder="Room password (optional)"
 					autocomplete="new-password"
-					class="w-full rounded-xl border border-[#27272a] bg-[#121214] px-3.5 py-2.5 text-sm text-[#f4f4f5] placeholder-[#71717a] transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+					class="w-full rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 text-sm text-(--ink-1) placeholder-(--ink-3) transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
 				/>
 				{#if passwordError}
 					<p class="mt-1 text-xs text-rose-400">{passwordError}</p>
@@ -149,7 +151,7 @@
 			</div>
 			<button
 				onclick={createRoom}
-				class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#6366f1] px-4 py-3 font-medium text-white shadow-sm transition-colors hover:bg-[#4f46e5] focus:ring-2 focus:ring-[#6366f1] focus:ring-offset-2 focus:ring-offset-[#18181b] focus:outline-none"
+				class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#6366f1] px-4 py-3 font-medium text-white shadow-sm transition-colors hover:bg-[#4f46e5] focus:ring-2 focus:ring-[#6366f1] focus:ring-offset-2 focus:ring-offset-(--surface-1) focus:outline-none"
 			>
 				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<line x1="12" y1="5" x2="12" y2="19"></line>
@@ -159,9 +161,9 @@
 			</button>
 
 			<div class="my-4 flex items-center gap-3">
-				<div class="h-px flex-1 bg-[#27272a]"></div>
-				<span class="font-mono text-xs text-[#71717a] uppercase">or join existing</span>
-				<div class="h-px flex-1 bg-[#27272a]"></div>
+				<div class="h-px flex-1 bg-(--surface-2)"></div>
+				<span class="font-mono text-xs text-(--ink-3) uppercase">or join existing</span>
+				<div class="h-px flex-1 bg-(--surface-2)"></div>
 			</div>
 
 			<!-- Action: Join Existing Room -->
@@ -171,11 +173,11 @@
 						type="text"
 						bind:value={joinRoomId}
 						placeholder="e.g. room-abc123 or paste link"
-						class="flex-1 rounded-xl border border-[#27272a] bg-[#121214] px-3.5 py-2.5 font-mono text-sm text-[#f4f4f5] placeholder-[#71717a] transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+						class="flex-1 rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 font-mono text-sm text-(--ink-1) placeholder-(--ink-3) transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
 					/>
 					<button
 						type="submit"
-						class="rounded-xl bg-[#27272a] px-4 py-2.5 text-sm font-medium text-[#f4f4f5] transition-colors hover:bg-[#3f3f46] focus:outline-none"
+						class="rounded-xl bg-(--surface-2) px-4 py-2.5 text-sm font-medium text-(--ink-1) transition-colors hover:bg-(--surface-3) focus:outline-none"
 					>
 						Join
 					</button>
@@ -189,7 +191,7 @@
 
 		<!-- Specifications summary footer -->
 		<div
-			class="mt-8 flex items-center justify-between border-t border-[#27272a] pt-6 text-[11px] text-[#71717a]"
+			class="mt-8 flex items-center justify-between border-t border-(--surface-2) pt-6 text-[11px] text-(--ink-3)"
 		>
 			<span>Cloudflare Workers + SQLite</span>
 			<span>Sub-16ms feedback</span>

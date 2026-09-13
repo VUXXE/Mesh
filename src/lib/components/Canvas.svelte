@@ -67,8 +67,8 @@
 			fontFamily,
 			padding,
 			isSticky,
-			color: isSticky ? '#18181b' : editingShape.stroke || '#f4f4f5',
-			bg: isSticky ? '#fef08a' : 'rgba(24, 24, 27, 0.9)',
+			color: isSticky ? '#18181b' : editingShape.stroke || 'var(--ink-1)',
+			bg: isSticky ? '#fef08a' : 'color-mix(in srgb, var(--surface-1) 90%, transparent)',
 			borderColor: isSticky ? '#eab308' : '#6366f1'
 		};
 	});
@@ -275,7 +275,7 @@
 	}
 </script>
 
-<div class="relative h-full w-full touch-none overflow-hidden bg-[#121214] select-none">
+<div class="relative h-full w-full touch-none overflow-hidden bg-(--surface-0) select-none">
 	<!-- Static Committed Buffer Canvas -->
 	<canvas bind:this={staticCanvas} class="pointer-events-none absolute inset-0"></canvas>
 
@@ -321,10 +321,10 @@
 	{#if shapes.size === 0}
 		<div class="pointer-events-none absolute inset-0 flex items-center justify-center select-none">
 			<div
-				class="rounded-lg border border-[#27272a] bg-[#18181b]/80 px-4 py-2.5 text-center shadow-lg backdrop-blur-sm"
+				class="rounded-lg border border-(--surface-2) bg-(--surface-1)/80 px-4 py-2.5 text-center shadow-lg backdrop-blur-sm"
 			>
-				<p class="text-sm font-medium text-[#f4f4f5]">Canvas is ready</p>
-				<p class="mt-0.5 text-xs text-[#a1a1aa]">
+				<p class="text-sm font-medium text-(--ink-1)">Canvas is ready</p>
+				<p class="mt-0.5 text-xs text-(--ink-2)">
 					Press P to draw, R for rectangle, or S for sticky note
 				</p>
 			</div>
@@ -333,9 +333,9 @@
 
 	<!-- Zoom Display Pill (DESIGN.md §4 numbers monospace) -->
 	<div
-		class="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 rounded-md border border-[#27272a] bg-[#18181b] px-2.5 py-1 text-xs text-[#a1a1aa] shadow-md"
+		class="absolute bottom-4 left-4 z-10 flex items-center gap-1.5 rounded-md border border-(--surface-2) bg-(--surface-1) px-2.5 py-1 text-xs text-(--ink-2) shadow-md"
 	>
-		<span class="font-mono text-[#f4f4f5] tabular-nums">{Math.round(viewport.zoom * 100)}%</span>
+		<span class="font-mono text-(--ink-1) tabular-nums">{Math.round(viewport.zoom * 100)}%</span>
 		{#if viewport.zoom !== 1 || viewport.panX !== 0 || viewport.panY !== 0}
 			<button
 				onclick={resetZoom}

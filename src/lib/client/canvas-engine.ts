@@ -72,6 +72,38 @@ export class CanvasEngine {
 	fontSize = 18;
 	fontFamily = 'sans';
 
+	static readonly DARK_DEFAULT_STROKE = '#f4f4f5';
+	static readonly LIGHT_DEFAULT_STROKE = '#18181b';
+
+	isLightTheme(): boolean {
+		return typeof document !== 'undefined' && document.documentElement.classList.contains('light');
+	}
+
+	defaultStroke(): string {
+		return this.isLightTheme()
+			? CanvasEngine.LIGHT_DEFAULT_STROKE
+			: CanvasEngine.DARK_DEFAULT_STROKE;
+	}
+
+	themeCanvasBg(): string {
+		return this.isLightTheme() ? '#fafafa' : '#121214';
+	}
+
+	/** Sync default stroke color with the active theme; call after toggling. */
+	applyTheme() {
+		const want = this.defaultStroke();
+		const other =
+			want === CanvasEngine.DARK_DEFAULT_STROKE
+				? CanvasEngine.LIGHT_DEFAULT_STROKE
+				: CanvasEngine.DARK_DEFAULT_STROKE;
+		if (this.strokeColor === other) {
+			this.strokeColor = want;
+			this.onStrokeColorChanged?.(want);
+		}
+		this.renderBuffer();
+		this.renderOverlay();
+	}
+
 	isSpacePressed = false;
 	isShiftPressed = false;
 
@@ -141,6 +173,8 @@ export class CanvasEngine {
 
 		this.staticCtx = sCtx;
 		this.overlayCtx = oCtx;
+
+		this.strokeColor = this.defaultStroke();
 
 		window.addEventListener('keydown', (e) => {
 			if (e.code === 'Space') this.isSpacePressed = true;
@@ -1509,7 +1543,7 @@ export class CanvasEngine {
 		const startY = Math.floor(startWorld.y / dotSpacing) * dotSpacing;
 
 		ctx.save();
-		ctx.fillStyle = '#27272a'; // zinc-800 subtle grid dots
+		ctx.fillStyle = this.isLightTheme() ? '#d4d4d8' : '#27272a'; // subtle grid dots
 
 		for (let x = startX; x <= endWorld.x; x += dotSpacing) {
 			for (let y = startY; y <= endWorld.y; y += dotSpacing) {
@@ -1522,7 +1556,7 @@ export class CanvasEngine {
 	private drawShape(ctx: CanvasRenderingContext2D, shape: ShapeRecord) {
 		ctx.save();
 
-		ctx.strokeStyle = shape.stroke || '#f4f4f5';
+		ctx.strokeStyle = shape.stroke || this.defaultStroke();
 		ctx.fillStyle = shape.fill || 'transparent';
 		ctx.lineWidth = shape.strokeWidth || 2;
 		ctx.lineCap = 'round';
@@ -1547,7 +1581,7 @@ export class CanvasEngine {
 						p1.y,
 						p2.x,
 						p2.y,
-						shape.stroke || '#f4f4f5',
+						shape.stroke || this.defaultStroke(),
 						shape.strokeWidth || 2
 					);
 				}
@@ -1575,7 +1609,7 @@ export class CanvasEngine {
 					const fSize = shape.data?.fontSize || 18;
 					const fFamily = getFontFamilyCss(shape.data?.fontFamily || 'sans');
 					ctx.font = `${fSize}px ${fFamily}`;
-					ctx.fillStyle = shape.stroke || '#f4f4f5';
+					ctx.fillStyle = shape.stroke || this.defaultStroke();
 					ctx.textBaseline = 'top';
 					const lineHeight = Math.round(fSize * 1.3);
 					const lines = text.split('\n');
@@ -1769,8 +1803,8 @@ export class CanvasEngine {
 
 		offCtx.scale(scale, scale);
 
-		// Dark canvas background (#121214)
-		offCtx.fillStyle = '#121214';
+		// Canvas background follows the active theme
+		offCtx.fillStyle = this.themeCanvasBg();
 		offCtx.fillRect(0, 0, w, h);
 
 		offCtx.translate(-minX + padding, -minY + padding);
@@ -1808,7 +1842,7 @@ export class CanvasEngine {
 		const h = Math.max(maxY - minY + padding * 2, 100);
 
 		let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX - padding} ${minY - padding} ${w} ${h}" width="${w}" height="${h}">\n`;
-		svgContent += `<rect x="${minX - padding}" y="${minY - padding}" width="${w}" height="${h}" fill="#121214"/>\n`;
+		svgContent += `<rect x="${minX - padding}" y="${minY - padding}" width="${w}" height="${h}" fill="${this.themeCanvasBg()}"/>\n`;
 
 		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
 		for (const shape of sorted) {
@@ -1930,7 +1964,7 @@ export class CanvasEngine {
 					width: item.width || 50,
 					height: item.height || 50,
 					fill: item.fill || 'transparent',
-					stroke: item.stroke || '#f4f4f5',
+					stroke: item.stroke || this.defaultStroke(),
 					strokeWidth: item.strokeWidth || 2,
 					rotation: item.rotation || 0,
 					zIndex: baseZ++,

@@ -159,7 +159,7 @@
 	{#if isCollapsed}
 		<button
 			onclick={() => (isCollapsed = false)}
-			class="rounded-lg border border-[#27272a] bg-[#18181b] p-2 text-[#a1a1aa] shadow-lg transition-colors hover:text-[#f4f4f5] focus:outline-none"
+			class="rounded-lg border border-(--surface-2) bg-(--surface-1) p-2 text-(--ink-2) shadow-lg transition-colors hover:text-(--ink-1) focus:outline-none"
 			title="Expand Minimap"
 		>
 			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -168,13 +168,13 @@
 		</button>
 	{:else}
 		<div
-			class="relative rounded-xl border border-[#27272a] bg-[#18181b] p-2 shadow-2xl backdrop-blur-md"
+			class="relative rounded-xl border border-(--surface-2) bg-(--surface-1) p-2 shadow-2xl backdrop-blur-md"
 		>
 			<div class="flex items-center justify-between px-0.5 pb-1.5">
-				<span class="text-[11px] font-medium text-[#a1a1aa]">Radar</span>
+				<span class="text-[11px] font-medium text-(--ink-2)">Radar</span>
 				<button
 					onclick={() => (isCollapsed = true)}
-					class="text-xs text-[#a1a1aa] hover:text-[#f4f4f5] focus:outline-none"
+					class="text-xs text-(--ink-2) hover:text-(--ink-1) focus:outline-none"
 					title="Minimize"
 				>
 					×
@@ -186,7 +186,7 @@
 				width={MM_WIDTH}
 				height={MM_HEIGHT}
 				onclick={handleMinimapClick}
-				class="cursor-pointer rounded-lg border border-[#27272a] bg-[#121214]"
+				class="cursor-pointer rounded-lg border border-(--surface-2) bg-(--surface-0)"
 			></canvas>
 		</div>
 	{/if}
