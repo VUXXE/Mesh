@@ -100,8 +100,9 @@
 	<title>Mesh: Serverless Real-Time Vector Whiteboard</title>
 </svelte:head>
 
+<!-- Dot texture echoes the whiteboard canvas grid (product motif, not decoration) -->
 <main
-	class="relative flex min-h-screen w-full flex-col items-center justify-center bg-(--surface-0) p-6 text-(--ink-1)"
+	class="landing-dots relative flex min-h-screen w-full flex-col items-center justify-center bg-(--surface-0) p-6 text-(--ink-1)"
 >
 	<a
 		href="https://github.com/VUXXE/Mesh"
@@ -130,8 +131,8 @@
 	<div
 		class="w-full max-w-md rounded-2xl border border-(--surface-2) bg-(--surface-1) p-8 shadow-2xl"
 	>
-		<!-- Brand & Logo -->
-		<div class="mb-6 flex items-center gap-3">
+		<!-- Brand -->
+		<div class="mb-2 flex items-center gap-3">
 			<div
 				class="relative h-12 w-12 shrink-0 overflow-hidden rounded-xl border border-(--surface-2) shadow-md"
 			>
@@ -142,6 +143,51 @@
 				<p class="text-xs text-(--ink-2)">Real-time collaborative vector whiteboard</p>
 			</div>
 		</div>
+
+		<p class="mb-5 text-sm leading-relaxed text-(--ink-2)">
+			A fast, distraction-free whiteboard that lives on the edge. No accounts, no setup — create a
+			room and start drawing together.
+		</p>
+
+		<!-- Honest capability ticks: everything listed is shipped -->
+		<ul class="mb-6 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-(--ink-2)">
+			<li class="flex items-center gap-1.5">
+				<svg
+					class="h-3.5 w-3.5 text-emerald-400"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+				>
+					<polyline points="20 6 9 17 4 12" />
+				</svg>
+				No sign-up
+			</li>
+			<li class="flex items-center gap-1.5">
+				<svg
+					class="h-3.5 w-3.5 text-emerald-400"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+				>
+					<polyline points="20 6 9 17 4 12" />
+				</svg>
+				Password-protected rooms
+			</li>
+			<li class="flex items-center gap-1.5">
+				<svg
+					class="h-3.5 w-3.5 text-emerald-400"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2.5"
+				>
+					<polyline points="20 6 9 17 4 12" />
+				</svg>
+				Self-hostable with Docker
+			</li>
+		</ul>
 
 		<!-- Action: Create Room -->
 		<div class="space-y-4">
@@ -170,7 +216,7 @@
 
 			<div class="my-4 flex items-center gap-3">
 				<div class="h-px flex-1 bg-(--surface-2)"></div>
-				<span class="font-mono text-xs text-(--ink-3) uppercase">or join existing</span>
+				<span class="text-xs text-(--ink-3)">or join existing</span>
 				<div class="h-px flex-1 bg-(--surface-2)"></div>
 			</div>
 
@@ -197,12 +243,26 @@
 			</form>
 		</div>
 
-		<!-- Specifications summary footer -->
+		<!-- Footer -->
 		<div
 			class="mt-8 flex items-center justify-between border-t border-(--surface-2) pt-6 text-[11px] text-(--ink-3)"
 		>
 			<span>Cloudflare Workers + SQLite</span>
-			<span>Sub-16ms feedback</span>
+			<a
+				href="https://github.com/VUXXE/Mesh"
+				target="_blank"
+				rel="noopener noreferrer"
+				class="transition-colors hover:text-(--ink-1)"
+			>
+				Open source (MIT)
+			</a>
 		</div>
 	</div>
 </main>
+
+<style>
+	.landing-dots {
+		background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1px);
+		background-size: 28px 28px;
+	}
+</style>
