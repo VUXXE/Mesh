@@ -171,34 +171,34 @@
 
 {#if !isValidRoomId}
 	<div
-		class="flex h-screen w-full flex-col items-center justify-center bg-[#121214] p-6 text-[#f4f4f5]"
+		class="flex h-screen w-full flex-col items-center justify-center bg-(--surface-0) p-6 text-(--ink-1)"
 	>
 		<div
-			class="max-w-sm rounded-2xl border border-[#27272a] bg-[#18181b] p-6 text-center shadow-xl"
+			class="max-w-sm rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 text-center shadow-xl"
 		>
 			<div
-				class="mx-auto mb-4 h-12 w-12 overflow-hidden rounded-xl border border-[#27272a] shadow-md"
+				class="mx-auto mb-4 h-12 w-12 overflow-hidden rounded-xl border border-(--surface-2) shadow-md"
 			>
 				<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
 			</div>
 			<p class="mb-2 font-semibold text-rose-400">Invalid Room ID</p>
-			<p class="mb-4 text-xs text-[#a1a1aa]">
+			<p class="mb-4 text-xs text-(--ink-2)">
 				Room IDs must consist of 3-64 alphanumeric characters, underscores, or hyphens.
 			</p>
 			<a
 				href="/"
-				class="inline-block rounded-lg bg-[#27272a] px-4 py-2 text-xs font-medium transition-colors hover:bg-[#3f3f46]"
+				class="inline-block rounded-lg bg-(--surface-2) px-4 py-2 text-xs font-medium transition-colors hover:bg-(--surface-3)"
 			>
 				Back to Home
 			</a>
 		</div>
 	</div>
 {:else if socket}
-	<div class="relative h-screen w-screen overflow-hidden bg-[#121214]">
+	<div class="relative h-screen w-screen overflow-hidden bg-(--surface-0)">
 		<!-- Top Left Brand / Return Home -->
 		<a
 			href="/"
-			class="group fixed top-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-[#27272a] bg-[#18181b]/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md transition-colors select-none hover:border-[#3f3f46] hover:bg-[#27272a]"
+			class="group fixed top-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1)/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md transition-colors select-none hover:border-(--surface-3) hover:bg-(--surface-2)"
 			title="Back to Mesh Home"
 		>
 			<img
@@ -206,7 +206,7 @@
 				alt="Mesh Logo"
 				class="h-5 w-5 rounded-md object-cover shadow-sm transition-transform group-hover:scale-105"
 			/>
-			<span class="text-xs font-semibold tracking-tight text-[#f4f4f5]">Mesh</span>
+			<span class="text-xs font-semibold tracking-tight text-(--ink-1)">Mesh</span>
 		</a>
 
 		<!-- Top Presence & Room Header -->
@@ -258,16 +258,16 @@
 		<!-- Password Gate -->
 		{#if socket.authRequired && !socket.authed}
 			<div
-				class="fixed inset-0 z-40 flex items-center justify-center bg-[#121214]/80 p-6 backdrop-blur-sm"
+				class="fixed inset-0 z-40 flex items-center justify-center bg-(--surface-0)/80 p-6 backdrop-blur-sm"
 			>
 				<div
-					class="w-full max-w-sm rounded-2xl border border-[#27272a] bg-[#18181b] p-6 text-center shadow-2xl"
+					class="w-full max-w-sm rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 text-center shadow-2xl"
 				>
 					<div
-						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-[#27272a] bg-[#121214]"
+						class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl border border-(--surface-2) bg-(--surface-0)"
 					>
 						<svg
-							class="h-5 w-5 text-[#a1a1aa]"
+							class="h-5 w-5 text-(--ink-2)"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
@@ -277,15 +277,15 @@
 							<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 						</svg>
 					</div>
-					<p class="mb-1 font-semibold text-[#f4f4f5]">This room is locked</p>
-					<p class="mb-4 text-xs text-[#a1a1aa]">Enter the room password to join.</p>
+					<p class="mb-1 font-semibold text-(--ink-1)">This room is locked</p>
+					<p class="mb-4 text-xs text-(--ink-2)">Enter the room password to join.</p>
 					<form onsubmit={handleAuthSubmit} class="space-y-2">
 						<input
 							type="password"
 							bind:value={authPassword}
 							placeholder="Room password"
 							autocomplete="current-password"
-							class="w-full rounded-xl border border-[#27272a] bg-[#121214] px-3.5 py-2.5 text-sm text-[#f4f4f5] placeholder-[#71717a] transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+							class="w-full rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 text-sm text-(--ink-1) placeholder-(--ink-3) transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
 						/>
 						{#if socket.authError}
 							<p class="text-xs text-rose-400">{socket.authError}</p>

@@ -68,9 +68,9 @@
 <div class="fixed top-4 right-4 z-20 flex items-center gap-2 select-none">
 	<!-- Room ID & Copy Options Pill -->
 	<div
-		class="flex items-center gap-1.5 rounded-lg border border-[#27272a] bg-[#18181b] px-3 py-1.5 shadow-lg backdrop-blur-md"
+		class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 py-1.5 shadow-lg backdrop-blur-md"
 	>
-		<span class="text-xs text-[#a1a1aa]">Room:</span>
+		<span class="text-xs text-(--ink-2)">Room:</span>
 		{#if locked}
 			<svg
 				class="h-3.5 w-3.5 text-amber-300"
@@ -86,17 +86,17 @@
 		{/if}
 		<button
 			onclick={copyRoomCode}
-			class="font-mono text-xs font-semibold text-[#f4f4f5] transition-colors hover:text-[#6366f1] focus:outline-none"
+			class="font-mono text-xs font-semibold text-(--ink-1) transition-colors hover:text-[#6366f1] focus:outline-none"
 			title="Click to copy code"
 		>
 			{roomId}
 		</button>
-		<div class="mx-0.5 h-3.5 w-px bg-[#27272a]"></div>
+		<div class="mx-0.5 h-3.5 w-px bg-(--surface-2)"></div>
 		<button
 			onclick={copyRoomCode}
 			class="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copiedCode
 				? 'bg-emerald-500/20 text-emerald-300'
-				: 'bg-[#27272a] text-[#a1a1aa] hover:text-[#f4f4f5]'}"
+				: 'bg-(--surface-2) text-(--ink-2) hover:text-(--ink-1)'}"
 			title="Copy room code only ({roomId})"
 		>
 			{copiedCode ? 'Code Copied!' : 'Copy Code'}
@@ -105,7 +105,7 @@
 			onclick={copyRoomLink}
 			class="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copiedLink
 				? 'bg-emerald-500/20 text-emerald-300'
-				: 'bg-[#27272a] text-[#a1a1aa] hover:text-[#f4f4f5]'}"
+				: 'bg-(--surface-2) text-(--ink-2) hover:text-(--ink-1)'}"
 			title="Copy full invite link"
 		>
 			{copiedLink ? 'Link Copied!' : 'Copy Link'}
@@ -114,7 +114,7 @@
 
 	<!-- Connection Status Indicator -->
 	<div
-		class="flex items-center gap-1.5 rounded-lg border border-[#27272a] bg-[#18181b] px-2.5 py-1.5 shadow-lg backdrop-blur-md"
+		class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 py-1.5 shadow-lg backdrop-blur-md"
 	>
 		{#if status === 'connected'}
 			<span class="h-2 w-2 rounded-full bg-emerald-500" title="Connected"></span>
@@ -130,13 +130,13 @@
 
 	<!-- Peers & User Pill -->
 	<div
-		class="flex items-center gap-1.5 rounded-lg border border-[#27272a] bg-[#18181b] px-2 py-1.5 shadow-lg backdrop-blur-md"
+		class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2 py-1.5 shadow-lg backdrop-blur-md"
 	>
 		<!-- Connected Peer Avatars -->
 		<div class="flex items-center -space-x-1.5 overflow-hidden">
 			{#each peers as peer (peer.userId)}
 				<div
-					class="flex h-6 w-6 cursor-help items-center justify-center rounded-full border-2 border-[#18181b] text-[10px] font-bold text-black shadow-sm"
+					class="flex h-6 w-6 cursor-help items-center justify-center rounded-full border-2 border-(--surface-1) text-[10px] font-bold text-black shadow-sm"
 					style="background-color: {peer.color};"
 					title={peer.name}
 				>
@@ -160,12 +160,12 @@
 					bind:value={nameInput}
 					onblur={saveName}
 					onkeydown={handleKeyDown}
-					class="w-24 rounded border border-[#6366f1] bg-[#27272a] px-1.5 py-0.5 text-xs text-[#f4f4f5] focus:outline-none"
+					class="w-24 rounded border border-[#6366f1] bg-(--surface-2) px-1.5 py-0.5 text-xs text-(--ink-1) focus:outline-none"
 				/>
 			{:else}
 				<button
 					onclick={() => (isEditingName = true)}
-					class="max-w-[100px] truncate text-xs text-[#f4f4f5] transition-colors hover:text-[#6366f1] focus:outline-none"
+					class="max-w-[100px] truncate text-xs text-(--ink-1) transition-colors hover:text-[#6366f1] focus:outline-none"
 					title="Click to edit your display name"
 				>
 					{currentUser.name}
