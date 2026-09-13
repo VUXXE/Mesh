@@ -258,6 +258,10 @@
 		engine?.handlePointerUp(e);
 	}
 
+	function handlePointerLeave() {
+		engine?.handlePointerLeave();
+	}
+
 	function handleDblClick(e: MouseEvent) {
 		engine?.handleDblClick(e);
 	}
@@ -282,6 +286,7 @@
 		onpointermove={handlePointerMove}
 		onpointerup={handlePointerUp}
 		onpointercancel={handlePointerUp}
+		onpointerleave={handlePointerLeave}
 		ondblclick={handleDblClick}
 		onwheel={handleWheel}
 		class="absolute inset-0 {canvasCursor}"
