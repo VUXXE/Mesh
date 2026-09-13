@@ -38,8 +38,15 @@
 
 - **Freehand Pen:** High-precision path capture with client-side Ramer-Douglas-Peucker (RDP) trajectory smoothing.
 - **Geometric Shapes:** Rectangles, ellipses, straight lines, and directional arrows with customizable stroke colors, fill shades, and stroke widths.
-- **Collaborative Notes:** Vector text labels and sticky notes with multi-line editing and color tags.
-- **Interactive Manipulation:** Hit testing for selection, multi-shape drag translation, bounding boxes, and deletion.
+- **Collaborative Notes:** Vector text labels and sticky notes with multi-line editing, font families (Sans, Serif, Mono), font sizes, and color tags.
+- **Interactive Manipulation:** Hit testing for selection, multi-shape drag translation, 8-handle resize boxes (including pen and arrow paths, with Shift aspect-ratio lock), bounding boxes, and deletion.
+- **Light & Dark Theme:** Sun/moon toggle in the header with canvas, grid, and export colors following the active theme. Preference persists in local storage.
+
+### 🔒 Room Passwords
+
+- **Optional Lock:** Set a password (4-128 characters) when creating a room from the landing page.
+- **Auth Gate:** Joiners see a password prompt; shapes, cursors, and presence are withheld and mutations are dropped until authentication succeeds.
+- **Hashed Storage:** Only a salted SHA-256 hash lives in room SQLite — plaintext passwords are never stored. Auth state rides the socket attachment so it survives hibernation, and browsers remember the password per tab for reconnects.
 
 ### 👥 Real-Time Collaboration & Presence
 
@@ -214,10 +221,17 @@ bun run lint
 # Format code
 bun run format
 
-# Run test suites
+# Run test suites (local edge server on :8788 required for live tests)
 bun run scripts/test-handshake.ts
 bun run scripts/test-sync-and-presence.ts
+bun run scripts/test-room-password.ts
 bun run scripts/test-room-link-parser.ts
+bun run scripts/test-history.ts
+bun run scripts/test-sticky-note.ts
+bun run scripts/test-arrow-line.ts
+bun run scripts/test-font-picker.ts
+bun run scripts/test-export-import.ts
+bun run scripts/test-touch-pinch.ts
 bun run scripts/test-e2e.ts
 ```
 
@@ -254,13 +268,18 @@ All WebSocket messages are encoded as JSON strings over standard secure WebSocke
 ### Client to Server (C2S)
 
 - `presence:update`: Broadcasts local cursor coordinates `(x, y)` and selected shape IDs at 30Hz.
+- `room:auth`: Submits a room password for authentication.
+- `room:set_password`: Sets (or, when authed, changes) the room password.
 - `shape:upsert`: Sends an array of created or modified `shapes[]` with millisecond timestamps.
 - `shape:delete`: Sends an array of deleted shape `ids[]`.
 - `canvas:clear`: Requests clearing all shapes from the active room.
 
 ### Server to Client (S2C)
 
-- `sync:init`: Initial room snapshot containing all committed shapes and active peers sent immediately upon connection.
+- `sync:init`: Initial room snapshot containing all committed shapes and active peers sent immediately upon connection. Carries `requiresPassword: true` with empty content when the room is locked and the socket is not yet authed.
+- `room:auth_ok`: Password accepted; full `sync:init` follows.
+- `room:auth_failed`: Password rejected.
+- `room:password_set`: A password was set on the room (sent to the setter plus a broadcast to peers).
 - `presence:peer`: Broadcasts remote peer cursor updates and selection state.
 - `shapes:upserted`: Propagates newly committed or updated shapes to room peers.
 - `shapes:deleted`: Propagates shape deletions.
