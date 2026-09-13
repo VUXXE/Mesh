@@ -83,6 +83,9 @@ export class CanvasEngine {
 	onToolChanged?: (tool: ToolMode) => void;
 	onStrokeColorChanged?: (color: string) => void;
 	onStrokeWidthChanged?: (width: number) => void;
+	editingShapeId: string | null = null;
+	onStartTextEdit?: (shape: ShapeRecord) => void;
+	onEndTextEdit?: () => void;
 
 	constructor(staticCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement) {
 		this.staticCanvas = staticCanvas;
@@ -561,19 +564,33 @@ export class CanvasEngine {
 				this.onActionRecorded?.({ type: 'create', shape });
 			}
 		} else if (this.interactionType === 'create_shape') {
-			const x = Math.min(this.startPoint.x, this.currentPoint.x);
-			const y = Math.min(this.startPoint.y, this.currentPoint.y);
-			const width = Math.max(Math.abs(this.currentPoint.x - this.startPoint.x), 10);
-			const height = Math.max(Math.abs(this.currentPoint.y - this.startPoint.y), 10);
+			let x = Math.min(this.startPoint.x, this.currentPoint.x);
+			let y = Math.min(this.startPoint.y, this.currentPoint.y);
+			let width = Math.abs(this.currentPoint.x - this.startPoint.x);
+			let height = Math.abs(this.currentPoint.y - this.startPoint.y);
 
 			let shapeType: ShapeType = 'rectangle';
 			let shapeData: any = undefined;
 
 			if (this.tool === 'ellipse') {
 				shapeType = 'ellipse';
+				width = Math.max(width, 10);
+				height = Math.max(height, 10);
 			} else if (this.tool === 'sticky_note') {
 				shapeType = 'sticky_note';
-				shapeData = { text: 'Note' };
+				shapeData = { text: '' };
+				if (width < 15 && height < 15) {
+					width = 180;
+					height = 180;
+					x = this.startPoint.x - 90;
+					y = this.startPoint.y - 90;
+				} else {
+					width = Math.max(width, 80);
+					height = Math.max(height, 80);
+				}
+			} else {
+				width = Math.max(width, 10);
+				height = Math.max(height, 10);
 			}
 
 			const shape: ShapeRecord = {
@@ -583,9 +600,9 @@ export class CanvasEngine {
 				y,
 				width,
 				height,
-				fill: this.tool === 'sticky_note' ? '#fef08a' : this.fillColor,
-				stroke: this.tool === 'sticky_note' ? '#eab308' : this.strokeColor,
-				strokeWidth: this.strokeWidth,
+				fill: shapeType === 'sticky_note' ? '#fef08a' : this.fillColor,
+				stroke: shapeType === 'sticky_note' ? '#eab308' : this.strokeColor,
+				strokeWidth: shapeType === 'sticky_note' ? 1 : this.strokeWidth,
 				rotation: 0,
 				zIndex: this.getNextZIndex(),
 				data: shapeData,
@@ -593,8 +610,17 @@ export class CanvasEngine {
 				updatedAt: now
 			};
 
+			this.shapes.set(shape.id, shape);
 			this.onShapesMutated?.([shape]);
 			this.onActionRecorded?.({ type: 'create', shape });
+			this.renderBuffer();
+
+			if (shapeType === 'sticky_note') {
+				this.selectedIds = [shape.id];
+				this.onSelectionChanged?.(this.selectedIds);
+				this.setTool('select');
+				this.startTextEdit(shape);
+			}
 		} else if (this.interactionType === 'drag_selection') {
 			const movedShapes: ShapeRecord[] = [];
 			const beforeShapes: ShapeRecord[] = [];
@@ -682,6 +708,68 @@ export class CanvasEngine {
 		}
 	}
 
+	getShape(id: string): ShapeRecord | undefined {
+		return this.shapes.get(id);
+	}
+
+	updateShape(shape: ShapeRecord) {
+		this.shapes.set(shape.id, shape);
+		this.renderBuffer();
+	}
+
+	deleteShapeById(id: string) {
+		const shape = this.shapes.get(id);
+		this.shapes.delete(id);
+		this.selectedIds = this.selectedIds.filter((sid) => sid !== id);
+		this.onSelectionChanged?.(this.selectedIds);
+		this.onShapesDeleted?.([id]);
+		if (shape) {
+			this.onActionRecorded?.({
+				type: 'delete',
+				shapes: [shape]
+			});
+		}
+		this.renderBuffer();
+		this.renderOverlay();
+	}
+
+	startTextEdit(shape: ShapeRecord) {
+		this.isInteracting = false;
+		this.interactionType = null;
+		this.editingShapeId = shape.id;
+		this.renderBuffer();
+		this.renderOverlay();
+		this.onStartTextEdit?.(shape);
+	}
+
+	endTextEdit() {
+		this.editingShapeId = null;
+		this.renderBuffer();
+		this.renderOverlay();
+		this.onEndTextEdit?.();
+	}
+
+	handleDblClick(e: MouseEvent) {
+		const worldPos = screenToWorld(
+			e.clientX,
+			e.clientY,
+			this.viewport.panX,
+			this.viewport.panY,
+			this.viewport.zoom
+		);
+
+		const sortedShapes = Array.from(this.shapes.values()).sort((a, b) => b.zIndex - a.zIndex);
+		const hit = sortedShapes.find((s) => hitTestShape(worldPos, s));
+
+		if (hit && (hit.type === 'sticky_note' || hit.type === 'text')) {
+			this.isInteracting = false;
+			this.interactionType = null;
+			this.selectedIds = [hit.id];
+			this.onSelectionChanged?.(this.selectedIds);
+			this.startTextEdit(hit);
+		}
+	}
+
 	private getNextZIndex(): number {
 		let maxZ = 0;
 		for (const s of this.shapes.values()) {
@@ -714,28 +802,31 @@ export class CanvasEngine {
 	}
 
 	private createTextInput(worldPos: { x: number; y: number }) {
-		const text = prompt('Enter text:');
-		if (!text) return;
-
+		const now = Date.now();
 		const shape: ShapeRecord = {
 			id: 'shape_' + Math.random().toString(36).substring(2, 9),
 			type: 'text',
 			x: worldPos.x,
 			y: worldPos.y,
-			width: Math.max(text.length * 10, 60),
-			height: 28,
+			width: 140,
+			height: 32,
 			fill: 'transparent',
 			stroke: this.strokeColor,
 			strokeWidth: 1,
 			rotation: 0,
 			zIndex: this.getNextZIndex(),
-			data: { text, fontSize: this.fontSize },
+			data: { text: '', fontSize: this.fontSize },
 			createdBy: '',
-			updatedAt: Date.now()
+			updatedAt: now
 		};
 
+		this.shapes.set(shape.id, shape);
 		this.onShapesMutated?.([shape]);
 		this.onActionRecorded?.({ type: 'create', shape });
+		this.selectedIds = [shape.id];
+		this.onSelectionChanged?.(this.selectedIds);
+		this.setTool('select');
+		this.startTextEdit(shape);
 	}
 
 	// -------------------------------------------------------------
@@ -844,10 +935,15 @@ export class CanvasEngine {
 			ctx.fillStyle = this.tool === 'sticky_note' ? 'rgba(254, 240, 138, 0.4)' : this.fillColor;
 			ctx.lineWidth = this.strokeWidth;
 
-			if (this.tool === 'rectangle' || this.tool === 'sticky_note') {
+			if (this.tool === 'sticky_note') {
+				ctx.beginPath();
+				ctx.roundRect(x, y, w, h, 6);
+				ctx.fill();
+				ctx.stroke();
+			} else if (this.tool === 'rectangle') {
 				ctx.beginPath();
 				ctx.rect(x, y, w, h);
-				if (this.fillColor !== 'transparent' || this.tool === 'sticky_note') ctx.fill();
+				if (this.fillColor !== 'transparent') ctx.fill();
 				ctx.stroke();
 			} else if (this.tool === 'ellipse') {
 				ctx.beginPath();
@@ -984,11 +1080,22 @@ export class CanvasEngine {
 			if (shape.fill && shape.fill !== 'transparent') ctx.fill();
 			ctx.stroke();
 		} else if (shape.type === 'text') {
-			const text = shape.data?.text || '';
-			const fSize = shape.data?.fontSize || 18;
-			ctx.font = `${fSize}px system-ui, -apple-system, sans-serif`;
-			ctx.fillStyle = shape.stroke || '#f4f4f5';
-			ctx.fillText(text, shape.x, shape.y + fSize);
+			if (this.editingShapeId !== shape.id || ctx !== this.staticCtx) {
+				const text = shape.data?.text || '';
+				if (text) {
+					const fSize = shape.data?.fontSize || 18;
+					ctx.font = `${fSize}px system-ui, -apple-system, sans-serif`;
+					ctx.fillStyle = shape.stroke || '#f4f4f5';
+					ctx.textBaseline = 'top';
+					const lineHeight = Math.round(fSize * 1.3);
+					const lines = text.split('\n');
+					let curY = shape.y;
+					for (const line of lines) {
+						ctx.fillText(line, shape.x, curY);
+						curY += lineHeight;
+					}
+				}
+			}
 		} else if (shape.type === 'sticky_note') {
 			// Sticky note body
 			ctx.save();
@@ -1001,14 +1108,80 @@ export class CanvasEngine {
 			ctx.stroke();
 
 			// Sticky note text
-			const text = shape.data?.text || '';
-			ctx.font = '14px system-ui, -apple-system, sans-serif';
-			ctx.fillStyle = '#18181b'; // dark text on yellow
-			ctx.fillText(text, shape.x + 10, shape.y + 24);
+			if (this.editingShapeId !== shape.id || ctx !== this.staticCtx) {
+				const text = shape.data?.text || '';
+				if (text) {
+					ctx.font = '14px system-ui, -apple-system, sans-serif';
+					ctx.fillStyle = '#18181b'; // dark text on yellow
+					ctx.textBaseline = 'top';
+
+					const padding = 12;
+					const maxWidth = Math.max(shape.width - padding * 2, 20);
+					const maxHeight = Math.max(shape.height - padding * 2, 20);
+					const lineHeight = 18;
+
+					ctx.save();
+					ctx.beginPath();
+					ctx.rect(shape.x + padding, shape.y + padding, maxWidth, maxHeight);
+					ctx.clip();
+
+					const lines = this.wrapText(ctx, text, maxWidth);
+					let currentY = shape.y + padding;
+					for (const line of lines) {
+						if (currentY + lineHeight > shape.y + shape.height) break;
+						ctx.fillText(line, shape.x + padding, currentY);
+						currentY += lineHeight;
+					}
+					ctx.restore();
+				}
+			}
 			ctx.restore();
 		}
 
 		ctx.restore();
+	}
+
+	private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
+		const result: string[] = [];
+		const rawLines = text.split('\n');
+
+		for (const rawLine of rawLines) {
+			if (rawLine === '') {
+				result.push('');
+				continue;
+			}
+			const words = rawLine.split(' ');
+			let currentLine = '';
+
+			for (let i = 0; i < words.length; i++) {
+				const word = words[i];
+				const testLine = currentLine ? `${currentLine} ${word}` : word;
+				if (ctx.measureText(testLine).width > maxWidth && currentLine) {
+					result.push(currentLine);
+					currentLine = word;
+				} else {
+					currentLine = testLine;
+				}
+
+				if (ctx.measureText(currentLine).width > maxWidth) {
+					let sub = '';
+					for (const char of currentLine) {
+						if (ctx.measureText(sub + char).width > maxWidth && sub) {
+							result.push(sub);
+							sub = char;
+						} else {
+							sub += char;
+						}
+					}
+					currentLine = sub;
+				}
+			}
+			if (currentLine) {
+				result.push(currentLine);
+			}
+		}
+
+		return result;
 	}
 
 	private drawPeerCursor(ctx: CanvasRenderingContext2D, peer: PeerPresence) {
@@ -1183,12 +1356,26 @@ export class CanvasEngine {
 			} else if (shape.type === 'text') {
 				const text = shape.data?.text || '';
 				const fSize = shape.data?.fontSize || 18;
-				svgContent += `<text x="${shape.x}" y="${shape.y + fSize}" font-family="system-ui, sans-serif" font-size="${fSize}" fill="${shape.stroke}">${text}</text>\n`;
+				const lines = text.split('\n');
+				svgContent += `<text x="${shape.x}" y="${shape.y + fSize}" font-family="system-ui, sans-serif" font-size="${fSize}" fill="${shape.stroke}">\n`;
+				for (let i = 0; i < lines.length; i++) {
+					const dy = i === 0 ? '0' : '1.3em';
+					svgContent += `<tspan x="${shape.x}" dy="${dy}">${this.escapeXml(lines[i])}</tspan>\n`;
+				}
+				svgContent += `</text>\n`;
 			} else if (shape.type === 'sticky_note') {
 				const text = shape.data?.text || '';
+				const lines = text.split('\n');
 				svgContent += `<g>\n`;
 				svgContent += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="6" fill="${shape.fill || '#fef08a'}" stroke="${shape.stroke || '#eab308'}" stroke-width="1"/>\n`;
-				svgContent += `<text x="${shape.x + 10}" y="${shape.y + 24}" font-family="system-ui, sans-serif" font-size="14" fill="#18181b">${text}</text>\n`;
+				if (lines.length > 0 && lines.some((l: string) => l.length > 0)) {
+					svgContent += `<text x="${shape.x + 12}" y="${shape.y + 24}" font-family="system-ui, sans-serif" font-size="14" fill="#18181b">\n`;
+					for (let i = 0; i < lines.length; i++) {
+						const dy = i === 0 ? '0' : '1.3em';
+						svgContent += `<tspan x="${shape.x + 12}" dy="${dy}">${this.escapeXml(lines[i])}</tspan>\n`;
+					}
+					svgContent += `</text>\n`;
+				}
 				svgContent += `</g>\n`;
 			}
 		}
@@ -1197,6 +1384,15 @@ export class CanvasEngine {
 
 		const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
 		this.triggerBrowserDownload(blob, filename);
+	}
+
+	private escapeXml(str: string): string {
+		return str
+			.replace(/&/g, '&amp;')
+			.replace(/</g, '&lt;')
+			.replace(/>/g, '&gt;')
+			.replace(/"/g, '&quot;')
+			.replace(/'/g, '&apos;');
 	}
 
 	exportToJson(filename = 'mesh-whiteboard.json') {
