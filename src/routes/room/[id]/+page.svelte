@@ -7,6 +7,7 @@
 	import Toolbar from '$lib/components/Toolbar.svelte';
 	import { CanvasEngine } from '$lib/client/canvas-engine';
 	import { RoomSocket } from '$lib/client/websocket.svelte';
+	import { HistoryManager, type HistoryAction } from '$lib/client/history.svelte';
 	import type { ShapeRecord } from '$lib/types';
 
 	const roomId = page.params.id ?? '';
@@ -15,6 +16,7 @@
 	let socket = $state<RoomSocket | null>(null);
 	let engine = $state<CanvasEngine | null>(null);
 	let selectedIds = $state<string[]>([]);
+	const history = new HistoryManager();
 
 	onMount(() => {
 		if (!isValidRoomId) return;
@@ -25,6 +27,22 @@
 			// Don't capture when typing in text inputs or modals
 			const target = e.target as HTMLElement;
 			if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+				return;
+			}
+
+			if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+				e.preventDefault();
+				if (e.shiftKey) {
+					handleRedo();
+				} else {
+					handleUndo();
+				}
+				return;
+			}
+
+			if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+				e.preventDefault();
+				handleRedo();
 				return;
 			}
 
@@ -80,8 +98,34 @@
 		socket?.setUserName(name);
 	}
 
+	function handleActionRecorded(action: HistoryAction) {
+		history.push(action);
+	}
+
+	function handleUndo() {
+		if (!socket) return;
+		history.undo(
+			(shapes) => socket!.upsertShapes(shapes),
+			(ids) => socket!.deleteShapes(ids),
+			() => socket!.clearCanvas()
+		);
+	}
+
+	function handleRedo() {
+		if (!socket) return;
+		history.redo(
+			(shapes) => socket!.upsertShapes(shapes),
+			(ids) => socket!.deleteShapes(ids),
+			() => socket!.clearCanvas()
+		);
+	}
+
 	function handleClearCanvas() {
 		if (confirm('Clear all drawings on this whiteboard?')) {
+			const all = Array.from(socket?.shapes.values() ?? []).map((s) => ({ ...s }));
+			if (all.length > 0) {
+				history.push({ type: 'clear', shapes: all });
+			}
 			socket?.clearCanvas();
 		}
 	}
@@ -139,11 +183,20 @@
 			onShapesDeleted={handleShapesDeleted}
 			onCursorMoved={handleCursorMoved}
 			onSelectionChanged={handleSelectionChanged}
+			onActionRecorded={handleActionRecorded}
 			bind:engine
 		/>
 
 		<!-- Bottom Floating Toolbar -->
-		<Toolbar {engine} selectedCount={selectedIds.length} onClearCanvas={handleClearCanvas} />
+		<Toolbar
+			{engine}
+			selectedCount={selectedIds.length}
+			canUndo={history.canUndo}
+			canRedo={history.canRedo}
+			onUndo={handleUndo}
+			onRedo={handleRedo}
+			onClearCanvas={handleClearCanvas}
+		/>
 
 		<!-- Bottom-Right Radar Minimap -->
 		<MiniMap {engine} shapes={socket.shapes} />

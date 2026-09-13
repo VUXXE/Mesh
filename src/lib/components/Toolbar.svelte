@@ -4,10 +4,22 @@
 	interface Props {
 		engine: CanvasEngine | null;
 		selectedCount: number;
+		canUndo?: boolean;
+		canRedo?: boolean;
+		onUndo?: () => void;
+		onRedo?: () => void;
 		onClearCanvas: () => void;
 	}
 
-	let { engine, selectedCount, onClearCanvas }: Props = $props();
+	let {
+		engine,
+		selectedCount,
+		canUndo = false,
+		canRedo = false,
+		onUndo,
+		onRedo,
+		onClearCanvas
+	}: Props = $props();
 
 	let activeTool = $state<ToolMode>('select');
 	let activeColor = $state<string>('#f4f4f5');
@@ -59,6 +71,39 @@
 <div
 	class="fixed bottom-6 left-1/2 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-xl border border-[#27272a] bg-[#18181b] px-2.5 py-2 shadow-2xl backdrop-blur-md select-none"
 >
+	<!-- Undo / Redo Group -->
+	<div class="flex items-center gap-0.5">
+		<button
+			onclick={onUndo}
+			disabled={!canUndo}
+			class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {canUndo
+				? 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'
+				: 'cursor-not-allowed text-[#52525b] opacity-40'}"
+			title="Undo (Ctrl+Z / Cmd+Z)"
+			aria-label="Undo"
+		>
+			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M3 7v6h6" />
+				<path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
+			</svg>
+		</button>
+		<button
+			onclick={onRedo}
+			disabled={!canRedo}
+			class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {canRedo
+				? 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'
+				: 'cursor-not-allowed text-[#52525b] opacity-40'}"
+			title="Redo (Ctrl+Shift+Z / Cmd+Shift+Z)"
+			aria-label="Redo"
+		>
+			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<path d="M21 7v6h-6" />
+				<path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
+			</svg>
+		</button>
+	</div>
+
+	<div class="mx-0.5 h-5 w-px bg-[#27272a]"></div>
 	<!-- Tools Group -->
 	<div class="flex items-center gap-1">
 		<!-- Select (V) -->

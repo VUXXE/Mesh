@@ -2,6 +2,7 @@
 	import { onMount } from 'svelte';
 	import { CanvasEngine, type ViewportState } from '$lib/client/canvas-engine';
 	import type { PeerPresence, ShapeRecord } from '$lib/types';
+	import type { HistoryAction } from '$lib/client/history.svelte';
 
 	interface Props {
 		shapes: Map<string, ShapeRecord>;
@@ -10,6 +11,7 @@
 		onShapesDeleted: (ids: string[]) => void;
 		onCursorMoved: (pos: { x: number; y: number } | null) => void;
 		onSelectionChanged: (selectedIds: string[]) => void;
+		onActionRecorded?: (action: HistoryAction) => void;
 		engine: CanvasEngine | null;
 	}
 
@@ -20,6 +22,7 @@
 		onShapesDeleted,
 		onCursorMoved,
 		onSelectionChanged,
+		onActionRecorded,
 		engine = $bindable(null)
 	}: Props = $props();
 
@@ -33,6 +36,7 @@
 		createdEngine.onShapesDeleted = onShapesDeleted;
 		createdEngine.onCursorMoved = onCursorMoved;
 		createdEngine.onSelectionChanged = onSelectionChanged;
+		createdEngine.onActionRecorded = onActionRecorded;
 		createdEngine.onViewportChanged = (vp) => {
 			viewport = { ...vp };
 		};

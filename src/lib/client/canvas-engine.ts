@@ -8,6 +8,7 @@ import {
 	type BoundingBox
 } from './math';
 import type { PathPoint, PeerPresence, ShapeRecord, ShapeType } from '../types';
+import type { HistoryAction } from './history.svelte';
 
 export type ToolMode = 'select' | 'pen' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note' | 'pan';
 
@@ -50,6 +51,7 @@ export class CanvasEngine {
 	// Selection state
 	selectedIds: string[] = [];
 	private dragInitialPositions = new Map<string, { x: number; y: number }>();
+	private dragInitialShapes = new Map<string, ShapeRecord>();
 
 	// Shape repository reference
 	private shapes: Map<string, ShapeRecord> = new Map();
@@ -61,6 +63,7 @@ export class CanvasEngine {
 	onSelectionChanged?: (selectedIds: string[]) => void;
 	onCursorMoved?: (pos: { x: number; y: number } | null) => void;
 	onViewportChanged?: (vp: ViewportState) => void;
+	onActionRecorded?: (action: HistoryAction) => void;
 
 	constructor(staticCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement) {
 		this.staticCanvas = staticCanvas;
@@ -145,12 +148,14 @@ export class CanvasEngine {
 
 	private applyPropertyToSelection(props: Partial<ShapeRecord>) {
 		if (this.selectedIds.length === 0) return;
+		const before: ShapeRecord[] = [];
 		const modified: ShapeRecord[] = [];
 		const now = Date.now();
 
 		for (const id of this.selectedIds) {
 			const shape = this.shapes.get(id);
 			if (shape) {
+				before.push({ ...shape });
 				const updated: ShapeRecord = {
 					...shape,
 					...props,
@@ -162,6 +167,11 @@ export class CanvasEngine {
 
 		if (modified.length > 0) {
 			this.onShapesMutated?.(modified);
+			this.onActionRecorded?.({
+				type: 'modify',
+				before,
+				after: modified
+			});
 		}
 	}
 
@@ -229,10 +239,12 @@ export class CanvasEngine {
 
 				this.interactionType = 'drag_selection';
 				this.dragInitialPositions.clear();
+				this.dragInitialShapes.clear();
 				for (const id of this.selectedIds) {
 					const shape = this.shapes.get(id);
 					if (shape) {
 						this.dragInitialPositions.set(id, { x: shape.x, y: shape.y });
+						this.dragInitialShapes.set(id, { ...shape });
 					}
 				}
 			} else {
@@ -363,6 +375,7 @@ export class CanvasEngine {
 				};
 
 				this.onShapesMutated?.([shape]);
+				this.onActionRecorded?.({ type: 'create', shape });
 			}
 			this.activePathPoints = [];
 		} else if (this.interactionType === 'create_shape') {
@@ -399,19 +412,29 @@ export class CanvasEngine {
 			};
 
 			this.onShapesMutated?.([shape]);
+			this.onActionRecorded?.({ type: 'create', shape });
 		} else if (this.interactionType === 'drag_selection') {
 			const movedShapes: ShapeRecord[] = [];
+			const beforeShapes: ShapeRecord[] = [];
 			for (const id of this.selectedIds) {
 				const shape = this.shapes.get(id);
-				if (shape) {
+				const initial = this.dragInitialShapes.get(id);
+				if (shape && initial && (shape.x !== initial.x || shape.y !== initial.y)) {
 					shape.updatedAt = now;
-					movedShapes.push(shape);
+					movedShapes.push({ ...shape });
+					beforeShapes.push(initial);
 				}
 			}
 			if (movedShapes.length > 0) {
 				this.onShapesMutated?.(movedShapes);
+				this.onActionRecorded?.({
+					type: 'modify',
+					before: beforeShapes,
+					after: movedShapes
+				});
 			}
 			this.dragInitialPositions.clear();
+			this.dragInitialShapes.clear();
 		}
 
 		this.isInteracting = false;
@@ -457,9 +480,24 @@ export class CanvasEngine {
 	deleteSelected() {
 		if (this.selectedIds.length === 0) return;
 		const toDelete = [...this.selectedIds];
+		const shapesToDelete: ShapeRecord[] = [];
+		for (const id of toDelete) {
+			const shape = this.shapes.get(id);
+			if (shape) {
+				shapesToDelete.push({ ...shape });
+			}
+		}
+
 		this.selectedIds = [];
 		this.onSelectionChanged?.(this.selectedIds);
 		this.onShapesDeleted?.(toDelete);
+
+		if (shapesToDelete.length > 0) {
+			this.onActionRecorded?.({
+				type: 'delete',
+				shapes: shapesToDelete
+			});
+		}
 	}
 
 	private getNextZIndex(): number {
@@ -515,6 +553,7 @@ export class CanvasEngine {
 		};
 
 		this.onShapesMutated?.([shape]);
+		this.onActionRecorded?.({ type: 'create', shape });
 	}
 
 	// -------------------------------------------------------------
