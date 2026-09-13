@@ -20,10 +20,15 @@
 
 	function handleJoin(e: Event) {
 		e.preventDefault();
-		const trimmed = joinRoomId.trim();
+		let trimmed = joinRoomId.trim();
 		if (!trimmed) {
-			errorMessage = 'Please enter a room code';
+			errorMessage = 'Please enter a room code or link';
 			return;
+		}
+
+		// Intelligently extract room code if full URL was pasted
+		if (trimmed.includes('/room/')) {
+			trimmed = trimmed.split('/room/').pop()?.split(/[?#/]/)[0] || trimmed;
 		}
 
 		if (!/^[a-zA-Z0-9_-]{3,64}$/.test(trimmed)) {
@@ -89,7 +94,7 @@
 					<input
 						type="text"
 						bind:value={joinRoomId}
-						placeholder="e.g. room-abc123"
+						placeholder="e.g. room-abc123 or paste link"
 						class="flex-1 rounded-xl border border-[#27272a] bg-[#121214] px-3.5 py-2.5 font-mono text-sm text-[#f4f4f5] placeholder-[#71717a] transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
 					/>
 					<button
