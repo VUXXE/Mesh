@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { CanvasEngine, type ViewportState } from '$lib/client/canvas-engine';
+	import { CanvasEngine, getFontFamilyCss, type ViewportState } from '$lib/client/canvas-engine';
 	import type { PeerPresence, ShapeRecord } from '$lib/types';
 	import type { HistoryAction } from '$lib/client/history.svelte';
 
@@ -45,6 +45,9 @@
 		const fontSize = isSticky
 			? Math.max(14 * viewport.zoom, 10)
 			: Math.max((editingShape.data?.fontSize || 18) * viewport.zoom, 12);
+		const fontFamily = isSticky
+			? 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+			: getFontFamilyCss(editingShape.data?.fontFamily || 'sans');
 		const padding = isSticky ? Math.max(12 * viewport.zoom, 8) : 6;
 
 		if (!isSticky) {
@@ -61,6 +64,7 @@
 			width,
 			height,
 			fontSize,
+			fontFamily,
 			padding,
 			isSticky,
 			color: isSticky ? '#18181b' : editingShape.stroke || '#f4f4f5',
@@ -110,6 +114,11 @@
 		};
 		createdEngine.onEndTextEdit = () => {
 			editingShape = null;
+		};
+		createdEngine.onTextShapeStyleChanged = (shape) => {
+			if (editingShape && editingShape.id === shape.id) {
+				editingShape = shape;
+			}
 		};
 		createdEngine.addToolChangedListener((t) => {
 			activeTool = t;
@@ -169,7 +178,10 @@
 		}
 
 		if (currentShape) {
-			const beforeShape = { ...currentShape };
+			const beforeShape = {
+				...currentShape,
+				data: currentShape.data ? { ...currentShape.data } : undefined
+			};
 			const updated: ShapeRecord = {
 				...currentShape,
 				data: {
@@ -186,10 +198,10 @@
 				updated.height = minH;
 			} else if (shapeType === 'text') {
 				const fSize = updated.data?.fontSize || 18;
-				const lines = editText.split('\n');
-				const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
-				updated.width = Math.max(maxLineLength * (fSize * 0.62), 40);
-				updated.height = Math.max(lines.length * (fSize * 1.3), 28);
+				const fFamily = updated.data?.fontFamily || 'sans';
+				const bounds = engine.calculateTextBounds(editText, fSize, fFamily);
+				updated.width = bounds.width;
+				updated.height = bounds.height;
 			}
 
 			engine.updateShape(updated);
@@ -296,7 +308,7 @@
 				? '#18181b'
 				: '#6366f1'}; background: {editBox.bg}; border: 1px solid {editBox.borderColor}; border-radius: {editBox.isSticky
 				? '6px'
-				: '4px'}; line-height: 1.3; font-family: system-ui, -apple-system, sans-serif; resize: none; z-index: 30; outline: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
+				: '4px'}; line-height: 1.3; font-family: {editBox.fontFamily}; resize: none; z-index: 30; outline: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
 			class="overflow-auto select-text"></textarea>
 	{/if}
 

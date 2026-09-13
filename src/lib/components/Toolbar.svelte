@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { CanvasEngine, ToolMode } from '$lib/client/canvas-engine';
+	import { FONT_FAMILIES, FONT_SIZES } from '$lib/client/canvas-engine';
 
 	interface Props {
 		engine: CanvasEngine | null;
@@ -24,15 +25,53 @@
 	let activeTool = $state<ToolMode>('select');
 	let activeColor = $state<string>('#f4f4f5');
 	let activeWidth = $state<number>(2);
+	let activeFontFamily = $state<string>('sans');
+	let activeFontSize = $state<number>(18);
+	let isTextShapeSelected = $state<boolean>(false);
+
+	const FONT_FAMILY_OPTIONS = [
+		{ label: 'Sans', value: 'sans', css: FONT_FAMILIES.sans },
+		{ label: 'Serif', value: 'serif', css: FONT_FAMILIES.serif },
+		{ label: 'Mono', value: 'mono', css: FONT_FAMILIES.mono }
+	];
+
+	function updateSelectedState() {
+		if (!engine || selectedCount === 0) {
+			isTextShapeSelected = false;
+			return;
+		}
+		const textShape = engine.selectedIds
+			.map((id) => engine.getShape(id))
+			.find((s) => s?.type === 'text');
+		isTextShapeSelected = Boolean(textShape);
+		if (textShape) {
+			if (textShape.data?.fontFamily) {
+				activeFontFamily = textShape.data.fontFamily;
+			}
+			if (textShape.data?.fontSize) {
+				activeFontSize = textShape.data.fontSize;
+			}
+		}
+	}
+
+	$effect(() => {
+		selectedCount;
+		activeTool;
+		updateSelectedState();
+	});
 
 	$effect(() => {
 		if (engine) {
 			activeTool = engine.tool;
 			activeColor = engine.strokeColor;
 			activeWidth = engine.strokeWidth;
+			activeFontFamily = engine.fontFamily;
+			activeFontSize = engine.fontSize;
+			updateSelectedState();
 
 			engine.onToolChanged = (tool) => {
 				activeTool = tool;
+				updateSelectedState();
 			};
 			engine.onStrokeColorChanged = (color) => {
 				activeColor = color;
@@ -40,8 +79,38 @@
 			engine.onStrokeWidthChanged = (width) => {
 				activeWidth = width;
 			};
+			engine.onFontFamilyChanged = (family) => {
+				activeFontFamily = family;
+			};
+			engine.onFontSizeChanged = (size) => {
+				activeFontSize = size;
+			};
+			const unsub = engine.addSelectionListener(() => {
+				updateSelectedState();
+			});
+			return unsub;
 		}
 	});
+
+	const isTextActive = $derived(activeTool === 'text' || isTextShapeSelected);
+
+	const hasNonTextSelected = $derived.by(() => {
+		if (!engine || selectedCount === 0) return false;
+		return engine.selectedIds.some((id) => {
+			const s = engine.getShape(id);
+			return s && s.type !== 'text';
+		});
+	});
+
+	const showStrokeWidth = $derived(
+		activeTool === 'pen' ||
+			activeTool === 'line' ||
+			activeTool === 'arrow' ||
+			activeTool === 'rectangle' ||
+			activeTool === 'ellipse' ||
+			hasNonTextSelected ||
+			(activeTool === 'select' && selectedCount === 0)
+	);
 
 	const STROKE_COLORS = [
 		{ label: 'White', value: '#f4f4f5' },
@@ -71,6 +140,16 @@
 	function setWidth(w: number) {
 		activeWidth = w;
 		engine?.setStrokeWidth(w);
+	}
+
+	function setFontFamily(family: string) {
+		activeFontFamily = family;
+		engine?.setFontFamily(family);
+	}
+
+	function setFontSize(size: number) {
+		activeFontSize = size;
+		engine?.setFontSize(size);
 	}
 
 	function handleDelete() {
@@ -339,23 +418,66 @@
 			{/each}
 		</div>
 
-		<div class="mx-1 h-5 w-px bg-[#27272a]"></div>
-
 		<!-- Stroke Width Selector -->
-		<div class="flex items-center gap-1">
-			{#each STROKE_WIDTHS as sw}
-				<button
-					onclick={() => setWidth(sw.value)}
-					class="rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeWidth ===
-					sw.value
-						? 'bg-[#27272a] font-medium text-[#f4f4f5]'
-						: 'text-[#a1a1aa] hover:text-[#f4f4f5]'}"
-					title="{sw.label} stroke width"
-				>
-					{sw.label}
-				</button>
-			{/each}
-		</div>
+		{#if showStrokeWidth}
+			<div class="mx-1 h-5 w-px bg-[#27272a]"></div>
+			<div class="flex items-center gap-1">
+				{#each STROKE_WIDTHS as sw}
+					<button
+						onclick={() => setWidth(sw.value)}
+						class="rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeWidth ===
+						sw.value
+							? 'bg-[#27272a] font-medium text-[#f4f4f5]'
+							: 'text-[#a1a1aa] hover:text-[#f4f4f5]'}"
+						title="{sw.label} stroke width"
+					>
+						{sw.label}
+					</button>
+				{/each}
+			</div>
+		{/if}
+
+		<!-- Font Family and Font Size Selector -->
+		{#if isTextActive}
+			<div class="mx-1 h-5 w-px bg-[#27272a]"></div>
+
+			<!-- Font Family Selector (Sans, Serif, Mono) -->
+			<div class="flex items-center gap-1">
+				{#each FONT_FAMILY_OPTIONS as f}
+					<button
+						onclick={() => setFontFamily(f.value)}
+						class="rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeFontFamily ===
+						f.value
+							? 'bg-[#27272a] font-medium text-[#f4f4f5] ring-1 ring-[#6366f1]'
+							: 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'}"
+						title="{f.label} font family"
+						style="font-family: {f.css};"
+						aria-label="{f.label} font family"
+					>
+						{f.label}
+					</button>
+				{/each}
+			</div>
+
+			<div class="mx-1 h-5 w-px bg-[#27272a]"></div>
+
+			<!-- Font Size Selector (S, M, L, XL) -->
+			<div class="flex items-center gap-1">
+				{#each FONT_SIZES as s}
+					<button
+						onclick={() => setFontSize(s.value)}
+						class="rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeFontSize ===
+						s.value
+							? 'bg-[#27272a] font-medium text-[#f4f4f5] ring-1 ring-[#6366f1]'
+							: 'text-[#a1a1aa] hover:bg-[#27272a] hover:text-[#f4f4f5]'}"
+						title={s.title}
+						aria-label="{s.label} font size"
+					>
+						{s.label}
+					</button>
+				{/each}
+			</div>
+		{/if}
 
 		<div class="mx-1 h-5 w-px bg-[#27272a]"></div>
 
