@@ -1,96 +1,170 @@
 <p align="center">
-  <img src="static/logo.png" alt="Mesh Logo" width="120" style="border-radius: 20px;" />
+  <img src="static/logo.png" alt="Mesh Logo" width="140" style="border-radius: 28px; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5);" />
 </p>
 
 <h1 align="center">Mesh</h1>
 
 <p align="center">
-  Serverless real-time collaborative vector whiteboard built with SvelteKit 2 (Svelte 5 Runes) and Cloudflare Workers (Durable Objects with embedded SQLite and WebSocket Hibernation).
+  <strong>Fast, distraction-free real-time collaborative vector whiteboard.</strong><br />
+  Built on SvelteKit 2 (Svelte 5 Runes) and Cloudflare Workers (Durable Objects with embedded SQLite &amp; WebSocket Hibernation).
 </p>
 
-## Features
+<p align="center">
+  <a href="#key-features"><img src="https://img.shields.io/badge/Svelte-5%20Runes-ff3e00?style=flat-square&logo=svelte&logoColor=white" alt="Svelte 5" /></a>
+  <a href="#key-features"><img src="https://img.shields.io/badge/Runtime-Cloudflare%20Workers-f38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers" /></a>
+  <a href="#architecture--storage"><img src="https://img.shields.io/badge/Storage-Embedded%20SQLite-003b57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite" /></a>
+  <a href="#self-hosting-with-docker"><img src="https://img.shields.io/badge/Self--Host-Docker%20Ready-2496ed?style=flat-square&logo=docker&logoColor=white" alt="Docker" /></a>
+  <a href="#getting-started"><img src="https://img.shields.io/badge/Package%20Manager-Bun-fbf0df?style=flat-square&logo=bun&logoColor=black" alt="Bun" /></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License" /></a>
+</p>
 
-- **Single-Origin Deployment:** SvelteKit frontend SSR/static assets and backend Durable Objects run under the same Cloudflare Worker origin.
-- **Embedded SQLite Persistence:** Durable Objects SQLite storage with monotonic Last-Write-Wins (LWW) conflict resolution.
-- **WebSocket Hibernation API:** Zero idle compute burn while maintaining active client sessions.
-- **Dual-Layer Canvas:**
-  - Committed static buffer canvas for vector shapes (`path`, `rectangle`, `ellipse`, `text`, `sticky_note`).
-  - 60fps interactive overlay for real-time stroke previews, bounding boxes, and peer cursors.
-- **Real-Time Presence:** Throttled 30Hz remote cursor tracking and peer selection indicators.
-- **Navigation & Radar:** MiniMap radar overview with click-to-pan navigation.
-- **Exporting:** Direct export to PNG and SVG.
+<br />
 
-## Tech Stack
+## Highlights
 
-- **Frontend:** SvelteKit 2, Svelte 5 (Runes), Tailwind CSS v4
-- **Runtime & Deployment:** Cloudflare Workers, `@sveltejs/adapter-cloudflare`, Wrangler
-- **Backend & Storage:** Cloudflare Durable Objects (`WhiteboardRoom`), Embedded SQLite
-- **Package Manager:** Bun
+- **Edge-Native & Serverless:** Front-end SSR, static assets, and backend Durable Objects live under the exact same Cloudflare Worker origin. No reverse proxy, zero CORS issues.
+- **Embedded SQLite Persistence:** Each room is powered by its own dedicated `WhiteboardRoom` Durable Object with transactional SQLite storage and monotonic Last-Write-Wins (LWW) conflict resolution.
+- **WebSocket Hibernation API:** Zero idle compute billing. Connections hibernate in memory at the edge until packets arrive.
+- **Dual-Layer Canvas Architecture:**
+  - _Committed Static Buffer:_ Re-rendered only upon shape mutations or viewport transformations.
+  - _60fps Interactive Overlay:_ Renders active drawing previews, selection handles, and live peer cursor movements smoothly without redrawing the entire scene.
+- **Self-Hostable Anywhere:** Deploy to Cloudflare Workers with one command, or self-host in any environment using Docker and Docker Compose. Zero external database dependencies.
 
-## Getting Started
+---
 
-### Install Dependencies
+## Key Features
 
-```bash
-bun install
+### ✏️ Vector Drawing Suite
+
+- **Freehand Pen:** High-precision path capture with client-side Ramer-Douglas-Peucker (RDP) trajectory smoothing.
+- **Geometric Shapes:** Rectangles, ellipses, straight lines, and directional arrows with customizable stroke colors, fill shades, and stroke widths.
+- **Collaborative Notes:** Vector text labels and sticky notes with multi-line editing and color tags.
+- **Interactive Manipulation:** Hit testing for selection, multi-shape drag translation, bounding boxes, and deletion.
+
+### 👥 Real-Time Collaboration & Presence
+
+- **Ephemeral Remote Cursors:** Remote pointer positions broadcast at 30Hz with smooth interpolated rendering.
+- **Custom Identity:** Live user avatars with customizable display names and signature colors saved in local storage.
+- **Zero-Storage Presence:** Cursor coordinates and selection packets are routed exclusively in memory and never touch disk.
+
+### ⏪ Multi-Level History (Undo / Redo)
+
+- Full local history stack supporting `Ctrl+Z` and `Ctrl+Y` / `Ctrl+Shift+Z`.
+- Tracks batch additions, property modifications, spatial translations, and shape deletions with immediate optimistic UI updates.
+
+### 📱 Touch Gestures & Navigation
+
+- **Pinch-to-Zoom:** Native two-finger pinch gesture scaling centered precisely around the touch midpoint.
+- **Two-Finger Pan:** Effortless canvas panning on mobile devices and trackpads with touch-action isolation.
+- **MiniMap Radar:** Real-time bird's-eye canvas overview with clickable quick-pan viewport positioning.
+
+### 💾 Backup & Export
+
+- **Export to PNG:** High-resolution bitmap snapshot rendering only the populated shape bounds.
+- **Export to SVG:** Pure vector graphic export suitable for Figma, Illustrator, or web embedding.
+- **Export to JSON:** Human-readable backup containing complete room vector states.
+- **Import from JSON:** One-click restoration from any previous JSON room backup.
+
+---
+
+## Architecture & Storage
+
+```mermaid
+flowchart TD
+    subgraph Client["Client Browser (Svelte 5 Runes)"]
+        UI["Dual-Layer Canvas Engine"]
+        Hist["History Manager (Undo/Redo)"]
+        Socket["WebSocket Client (Auto-Reconnect)"]
+        UI <--> Socket
+        UI <--> Hist
+    end
+
+    subgraph Edge["Cloudflare Worker / Docker Container"]
+        Origin["Single-Origin Router (hooks.server.ts)"]
+        DO["WhiteboardRoom Durable Object"]
+        SQLite[("Embedded SQLite DB")]
+        MemStore["Ephemeral In-Memory Presence"]
+
+        Origin -->|HTTP / SSR| UI
+        Socket <-->|WebSocket 101| DO
+        DO <-->|LWW Monotonic Upsert| SQLite
+        DO <-->|30Hz Broadcast| MemStore
+    end
 ```
 
-### Type Generation
+### Monotonic LWW Concurrency
 
-```bash
-bun run gen
+Conflict resolution operates strictly under monotonic Last-Write-Wins (LWW):
+
+```sql
+INSERT INTO shapes (id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+ON CONFLICT(id) DO UPDATE SET
+    type = excluded.type,
+    x = excluded.x,
+    y = excluded.y,
+    width = excluded.width,
+    height = excluded.height,
+    fill = excluded.fill,
+    stroke = excluded.stroke,
+    stroke_width = excluded.stroke_width,
+    rotation = excluded.rotation,
+    z_index = excluded.z_index,
+    data = excluded.data,
+    updated_at = excluded.updated_at
+WHERE excluded.updated_at >= shapes.updated_at;
 ```
 
-### Type Checking & Linting
+---
 
-```bash
-bun run check
-bun run lint
-```
+## Tools & Keyboard Shortcuts
 
-### Build & Preview Locally
+| Shortcut                        | Tool / Action   | Description                                |
+| :------------------------------ | :-------------- | :----------------------------------------- |
+| `V` or `1`                      | **Select**      | Select, drag, and manipulate shapes        |
+| `P` or `2`                      | **Pen**         | Freehand vector drawing with RDP smoothing |
+| `L` or `3`                      | **Line**        | Straight line tool                         |
+| `A` or `4`                      | **Arrow**       | Directional vector arrow                   |
+| `R` or `5`                      | **Rectangle**   | Geometric box with stroke and fill         |
+| `O` or `6`                      | **Ellipse**     | Geometric circle / ellipse                 |
+| `T` or `7`                      | **Text**        | Place editable text labels                 |
+| `S` or `8`                      | **Sticky Note** | Collaborative colored sticky note          |
+| `H` or `Space + Drag`           | **Pan Canvas**  | Navigate across the infinite canvas        |
+| `Ctrl + Z`                      | **Undo**        | Revert the most recent action              |
+| `Ctrl + Y` / `Ctrl + Shift + Z` | **Redo**        | Reapply the previously undone action       |
+| `Delete` / `Backspace`          | **Delete**      | Remove selected shapes                     |
+| `Wheel` / `Ctrl + +/-`          | **Zoom**        | Zoom viewport in and out                   |
 
-```bash
-bun run build
-bun run preview
-```
-
-### Running Tests
-
-```bash
-bun run scripts/test-handshake.ts
-bun run scripts/test-sync-and-presence.ts
-bun run scripts/test-e2e.ts
-```
+---
 
 ## Self-Hosting with Docker
 
-Mesh can be completely self-hosted on any VPS, home server, or local machine with Docker. Embedded SQLite databases and real-time collaboration work out of the box with zero external database dependencies.
+Mesh is completely self-contained. You can self-host it on any Linux VPS, Raspberry Pi, home server, or local machine.
 
 ### Quick Start with Docker Compose
 
 ```bash
-# Clone the repository
+# 1. Clone the repository
 git clone https://github.com/VUXXE/Mesh.git
 cd Mesh
 
-# Start the whiteboard service
+# 2. Start the whiteboard server
 docker compose up -d
 ```
 
-Once running, visit `http://localhost:4173` to create and share rooms.
+Access the application at `http://localhost:4173`.
 
-### Persistent Storage
+### Persistent Data
 
-All rooms, vector shapes, and SQLite data are persisted in the named volume `mesh_data` mapped to `/data` in the container. Whiteboard data is safely preserved across container restarts and image updates.
+All whiteboard rooms, vector data, and SQLite databases are safely preserved in the named Docker volume `mesh_data` mapped to `/data` in the container.
 
 ### Run with Docker CLI
 
 ```bash
-# Build the image
+# Build the production image
 docker build -t mesh .
 
-# Run with persistent volume
+# Run with persistent storage
 docker run -d \
   --name mesh-whiteboard \
   --restart unless-stopped \
@@ -101,7 +175,100 @@ docker run -d \
 
 ### Configuration Options
 
-| Variable      | Default | Description                                          |
-| :------------ | :------ | :--------------------------------------------------- |
-| `PORT`        | `4173`  | Listening port for the application                   |
-| `PERSIST_DIR` | `/data` | Persistence path for SQLite databases and room state |
+| Variable      | Default | Description                                                 |
+| :------------ | :------ | :---------------------------------------------------------- |
+| `PORT`        | `4173`  | Internal listening port                                     |
+| `PERSIST_DIR` | `/data` | Directory where SQLite databases and room states are stored |
+
+---
+
+## Local Development
+
+### Prerequisites
+
+- [Bun](https://bun.sh) (v1.1+)
+- Node.js (v20+ or v22+)
+
+### Setup
+
+```bash
+# Install dependencies
+bun install
+
+# Generate Cloudflare Worker TypeScript types
+bun run gen
+
+# Run the development server
+bun run dev
+```
+
+### Verification & Testing
+
+```bash
+# Run type checks and diagnostics
+bun run check
+
+# Check Prettier code formatting
+bun run lint
+
+# Format code
+bun run format
+
+# Run test suites
+bun run scripts/test-handshake.ts
+bun run scripts/test-sync-and-presence.ts
+bun run scripts/test-room-link-parser.ts
+bun run scripts/test-e2e.ts
+```
+
+### Production Build & Local Edge Emulation
+
+```bash
+# Build SvelteKit bundle and inject Durable Object exports
+bun run build
+
+# Preview locally with Cloudflare Workers (Miniflare/workerd)
+bun run preview
+```
+
+---
+
+## Cloudflare Deployment
+
+Deploy Mesh to Cloudflare Workers with zero infrastructure management:
+
+```bash
+# Authenticate with Cloudflare
+bunx wrangler login
+
+# Deploy directly to your Cloudflare account
+bunx wrangler deploy
+```
+
+---
+
+## Wire Protocol Reference
+
+All WebSocket messages are encoded as JSON strings over standard secure WebSockets (`wss://`).
+
+### Client to Server (C2S)
+
+- `presence:update`: Broadcasts local cursor coordinates `(x, y)` and selected shape IDs at 30Hz.
+- `shape:upsert`: Sends an array of created or modified `shapes[]` with millisecond timestamps.
+- `shape:delete`: Sends an array of deleted shape `ids[]`.
+- `canvas:clear`: Requests clearing all shapes from the active room.
+
+### Server to Client (S2C)
+
+- `sync:init`: Initial room snapshot containing all committed shapes and active peers sent immediately upon connection.
+- `presence:peer`: Broadcasts remote peer cursor updates and selection state.
+- `shapes:upserted`: Propagates newly committed or updated shapes to room peers.
+- `shapes:deleted`: Propagates shape deletions.
+- `peer:left`: Notifies remaining peers when a user disconnects.
+- `canvas:cleared`: Signals all clients to clear their canvas.
+
+---
+
+## License
+
+Mesh is open-source software licensed under the [MIT License](LICENSE).
