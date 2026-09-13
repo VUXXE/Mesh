@@ -4,6 +4,8 @@
 
 	let joinRoomId = $state('');
 	let errorMessage = $state('');
+	let roomPassword = $state('');
+	let passwordError = $state('');
 
 	function generateRoomId(): string {
 		const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
@@ -15,7 +17,19 @@
 	}
 
 	function createRoom() {
+		passwordError = '';
+		if (roomPassword && (roomPassword.length < 4 || roomPassword.length > 128)) {
+			passwordError = 'Password must be 4-128 characters';
+			return;
+		}
 		const newId = generateRoomId();
+		if (roomPassword) {
+			try {
+				sessionStorage.setItem(`mesh_new_room_pw_${newId}`, roomPassword);
+			} catch {
+				// Ignore storage errors (private mode, etc.)
+			}
+		}
 		goto(`/room/${newId}`);
 	}
 
@@ -64,6 +78,18 @@
 
 		<!-- Action: Create Room -->
 		<div class="space-y-4">
+			<div class="space-y-2">
+				<input
+					type="password"
+					bind:value={roomPassword}
+					placeholder="Room password (optional)"
+					autocomplete="new-password"
+					class="w-full rounded-xl border border-[#27272a] bg-[#121214] px-3.5 py-2.5 text-sm text-[#f4f4f5] placeholder-[#71717a] transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+				/>
+				{#if passwordError}
+					<p class="mt-1 text-xs text-rose-400">{passwordError}</p>
+				{/if}
+			</div>
 			<button
 				onclick={createRoom}
 				class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#6366f1] px-4 py-3 font-medium text-white shadow-sm transition-colors hover:bg-[#4f46e5] focus:ring-2 focus:ring-[#6366f1] focus:ring-offset-2 focus:ring-offset-[#18181b] focus:outline-none"

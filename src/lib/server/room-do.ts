@@ -25,7 +25,11 @@ interface PeerAttachment {
 	color: string;
 	cursor: { x: number; y: number } | null;
 	selectedIds: string[];
+	authed: boolean;
 }
+
+const MIN_PASSWORD_LENGTH = 4;
+const MAX_PASSWORD_LENGTH = 128;
 
 export class WhiteboardRoom extends DurableObject {
 	private rateLimits = new Map<WebSocket, { count: number; resetAt: number }>();
@@ -55,6 +59,10 @@ export class WhiteboardRoom extends DurableObject {
 			);
 			CREATE INDEX IF NOT EXISTS idx_shapes_z_index ON shapes(z_index ASC);
 			CREATE INDEX IF NOT EXISTS idx_shapes_updated ON shapes(updated_at DESC);
+			CREATE TABLE IF NOT EXISTS room_meta (
+				key TEXT PRIMARY KEY NOT NULL,
+				value TEXT NOT NULL
+			);
 		`);
 	}
 
@@ -78,15 +86,17 @@ export class WhiteboardRoom extends DurableObject {
 		const roomIdMatch = url.pathname.match(/\/api\/room\/([^/]+)\/ws/);
 		const roomId = roomIdMatch ? roomIdMatch[1] : 'unknown';
 
-		const shapes = this.getAllShapes();
-		const peers = this.getActivePeers();
+		const passwordSet = this.hasPassword();
+		const shapes = passwordSet ? [] : this.getAllShapes();
+		const peers = passwordSet ? [] : this.getActivePeers();
 
 		const initMsg: S2CMessage = {
 			type: 'sync:init',
 			roomId,
 			serverTime: Date.now(),
 			shapes,
-			peers
+			peers,
+			requiresPassword: passwordSet ? true : undefined
 		};
 
 		server.send(JSON.stringify(initMsg));
@@ -139,14 +149,54 @@ export class WhiteboardRoom extends DurableObject {
 		}
 
 		switch (payload.type) {
+			case 'room:auth': {
+				if (!this.hasPassword()) {
+					this.markAuthed(ws);
+					ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
+					this.sendFullSync(ws);
+					break;
+				}
+				const ok = await this.verifyPassword(payload.password ?? '');
+				if (ok) {
+					this.markAuthed(ws);
+					ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
+					this.sendFullSync(ws);
+				} else {
+					ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
+				}
+				break;
+			}
+
+			case 'room:set_password': {
+				const pw = payload.password ?? '';
+				if (pw.length < MIN_PASSWORD_LENGTH || pw.length > MAX_PASSWORD_LENGTH) {
+					return;
+				}
+				// Setting a new password is open when the room has none yet;
+				// changing an existing one requires an authed socket.
+				if (this.hasPassword() && !this.isAuthed(ws)) {
+					return;
+				}
+				await this.setPassword(pw);
+				this.markAuthed(ws);
+				ws.send(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage));
+				this.broadcast(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage), ws);
+				this.sendFullSync(ws);
+				break;
+			}
+
 			case 'presence:update': {
+				if (this.hasPassword() && !this.isAuthed(ws)) {
+					return;
+				}
 				// Ephemeral presence: MUST NEVER touch SQLite (PRD FR-2.4)
 				const attachment: PeerAttachment = {
 					userId: payload.userId,
 					name: payload.name,
 					color: payload.color,
 					cursor: payload.cursor,
-					selectedIds: payload.selectedIds
+					selectedIds: payload.selectedIds,
+					authed: this.isAuthed(ws)
 				};
 				ws.serializeAttachment(attachment);
 
@@ -164,6 +214,10 @@ export class WhiteboardRoom extends DurableObject {
 
 			case 'shape:upsert': {
 				if (!payload.shapes || !Array.isArray(payload.shapes) || payload.shapes.length === 0) {
+					return;
+				}
+
+				if (this.hasPassword() && !this.isAuthed(ws)) {
 					return;
 				}
 
@@ -251,6 +305,10 @@ export class WhiteboardRoom extends DurableObject {
 					return;
 				}
 
+				if (this.hasPassword() && !this.isAuthed(ws)) {
+					return;
+				}
+
 				this.ctx.storage.transactionSync(() => {
 					for (const id of payload.ids) {
 						this.ctx.storage.sql.exec('DELETE FROM shapes WHERE id = ?', id);
@@ -266,6 +324,10 @@ export class WhiteboardRoom extends DurableObject {
 			}
 
 			case 'canvas:clear': {
+				if (this.hasPassword() && !this.isAuthed(ws)) {
+					return;
+				}
+
 				this.ctx.storage.sql.exec('DELETE FROM shapes');
 
 				const broadcastMsg: S2CMessage = {
@@ -301,6 +363,88 @@ export class WhiteboardRoom extends DurableObject {
 		} catch {
 			// Ignore socket close errors
 		}
+	}
+
+	private getMeta(key: string): string | null {
+		const rows = this.ctx.storage.sql
+			.exec<{ value: string }>('SELECT value FROM room_meta WHERE key = ?', key)
+			.toArray();
+		return rows[0]?.value ?? null;
+	}
+
+	private setMeta(key: string, value: string): void {
+		this.ctx.storage.sql.exec(
+			'INSERT INTO room_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
+			key,
+			value
+		);
+	}
+
+	private hasPassword(): boolean {
+		return this.getMeta('password_hash') !== null;
+	}
+
+	private isAuthed(ws: WebSocket): boolean {
+		const att = ws.deserializeAttachment() as PeerAttachment | null;
+		return att?.authed === true;
+	}
+
+	private markAuthed(ws: WebSocket): void {
+		const att = (ws.deserializeAttachment() as PeerAttachment | null) ?? {
+			userId: '',
+			name: '',
+			color: '',
+			cursor: null,
+			selectedIds: [],
+			authed: false
+		};
+		att.authed = true;
+		ws.serializeAttachment(att);
+	}
+
+	private async hashPassword(password: string, salt: string): Promise<string> {
+		const digest = await crypto.subtle.digest(
+			'SHA-256',
+			new TextEncoder().encode(`${salt}:${password}`)
+		);
+		return Array.from(new Uint8Array(digest))
+			.map((b) => b.toString(16).padStart(2, '0'))
+			.join('');
+	}
+
+	private hashesEqual(a: string, b: string): boolean {
+		if (a.length !== b.length) return false;
+		let diff = 0;
+		for (let i = 0; i < a.length; i++) {
+			diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+		}
+		return diff === 0;
+	}
+
+	private async setPassword(password: string): Promise<void> {
+		const salt = crypto.randomUUID();
+		const hash = await this.hashPassword(password, salt);
+		this.setMeta('password_salt', salt);
+		this.setMeta('password_hash', hash);
+	}
+
+	private async verifyPassword(password: string): Promise<boolean> {
+		const salt = this.getMeta('password_salt');
+		const expected = this.getMeta('password_hash');
+		if (!salt || !expected) return false;
+		const actual = await this.hashPassword(password, salt);
+		return this.hashesEqual(actual, expected);
+	}
+
+	private sendFullSync(ws: WebSocket): void {
+		const fullInit: S2CMessage = {
+			type: 'sync:init',
+			roomId: '',
+			serverTime: Date.now(),
+			shapes: this.getAllShapes(),
+			peers: this.getActivePeers()
+		};
+		ws.send(JSON.stringify(fullInit));
 	}
 
 	private broadcast(message: string, excludeWs?: WebSocket): void {
