@@ -13,6 +13,32 @@ import type { HistoryAction } from './history.svelte';
 export type ToolMode =
 	'select' | 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note' | 'pan';
 
+export const FONT_FAMILIES = {
+	sans: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+	serif: 'Georgia, Cambria, "Times New Roman", Times, serif',
+	mono: '"JetBrains Mono", Menlo, Monaco, Consolas, "Courier New", monospace'
+} as const;
+
+export type FontFamilyKey = keyof typeof FONT_FAMILIES;
+
+export const FONT_SIZES = [
+	{ label: 'S', value: 14, title: 'Small (14px)' },
+	{ label: 'M', value: 18, title: 'Medium (18px)' },
+	{ label: 'L', value: 28, title: 'Large (28px)' },
+	{ label: 'XL', value: 40, title: 'Extra Large (40px)' }
+] as const;
+
+export function getFontFamilyCss(family?: string): string {
+	if (!family) return FONT_FAMILIES.sans;
+	if (family in FONT_FAMILIES) return FONT_FAMILIES[family as FontFamilyKey];
+	return family;
+}
+
+export function getFontFamilySvg(family?: string): string {
+	const css = getFontFamilyCss(family);
+	return css.replace(/"/g, "'");
+}
+
 export interface ViewportState {
 	panX: number;
 	panY: number;
@@ -38,6 +64,7 @@ export class CanvasEngine {
 	fillColor = 'transparent';
 	strokeWidth = 2;
 	fontSize = 18;
+	fontFamily = 'sans';
 
 	isSpacePressed = false;
 	isShiftPressed = false;
@@ -84,6 +111,9 @@ export class CanvasEngine {
 	onToolChanged?: (tool: ToolMode) => void;
 	onStrokeColorChanged?: (color: string) => void;
 	onStrokeWidthChanged?: (width: number) => void;
+	onFontFamilyChanged?: (family: string) => void;
+	onFontSizeChanged?: (size: number) => void;
+	onTextShapeStyleChanged?: (shape: ShapeRecord) => void;
 	editingShapeId: string | null = null;
 	onStartTextEdit?: (shape: ShapeRecord) => void;
 	onEndTextEdit?: () => void;
@@ -138,6 +168,7 @@ export class CanvasEngine {
 
 	setShapes(shapes: Map<string, ShapeRecord>) {
 		this.shapes = shapes;
+		this.updateFontSettingsFromSelection();
 		this.renderBuffer();
 		this.renderOverlay();
 	}
@@ -148,6 +179,7 @@ export class CanvasEngine {
 	}
 
 	private toolChangedListeners: ((tool: ToolMode) => void)[] = [];
+	private selectionListeners: ((selectedIds: string[]) => void)[] = [];
 
 	addToolChangedListener(fn: (tool: ToolMode) => void) {
 		this.toolChangedListeners.push(fn);
@@ -157,11 +189,42 @@ export class CanvasEngine {
 		this.toolChangedListeners = this.toolChangedListeners.filter((l) => l !== fn);
 	}
 
+	addSelectionListener(fn: (selectedIds: string[]) => void) {
+		this.selectionListeners.push(fn);
+		return () => {
+			this.selectionListeners = this.selectionListeners.filter((l) => l !== fn);
+		};
+	}
+
+	setSelectedIds(ids: string[]) {
+		this.selectedIds = ids;
+		this.updateFontSettingsFromSelection();
+		this.onSelectionChanged?.(this.selectedIds);
+		for (const fn of this.selectionListeners) {
+			fn(this.selectedIds);
+		}
+	}
+
+	private updateFontSettingsFromSelection() {
+		const textShape = this.selectedIds
+			.map((id) => this.shapes.get(id))
+			.find((s) => s?.type === 'text');
+		if (textShape) {
+			if (textShape.data?.fontFamily) {
+				this.fontFamily = textShape.data.fontFamily;
+				this.onFontFamilyChanged?.(this.fontFamily);
+			}
+			if (textShape.data?.fontSize) {
+				this.fontSize = textShape.data.fontSize;
+				this.onFontSizeChanged?.(this.fontSize);
+			}
+		}
+	}
+
 	setTool(tool: ToolMode) {
 		this.tool = tool;
 		if (tool !== 'select') {
-			this.selectedIds = [];
-			this.onSelectionChanged?.(this.selectedIds);
+			this.setSelectedIds([]);
 		}
 		this.renderOverlay();
 		this.onToolChanged?.(tool);
@@ -187,6 +250,154 @@ export class CanvasEngine {
 		this.onStrokeWidthChanged?.(width);
 	}
 
+	calculateTextBounds(
+		text: string,
+		fontSize: number,
+		fontFamily: string = 'sans'
+	): { width: number; height: number } {
+		if (!text) {
+			return { width: 140, height: Math.max(Math.round(fontSize * 1.3), 32) };
+		}
+		const lines = text.split('\n');
+		const fFamily = getFontFamilyCss(fontFamily);
+		let maxWidth = 0;
+		if (this.staticCtx) {
+			this.staticCtx.save();
+			this.staticCtx.font = `${fontSize}px ${fFamily}`;
+			for (const line of lines) {
+				const metrics = this.staticCtx.measureText(line);
+				if (metrics.width > maxWidth) {
+					maxWidth = metrics.width;
+				}
+			}
+			this.staticCtx.restore();
+		} else {
+			const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
+			maxWidth = maxLineLength * (fontSize * 0.62);
+		}
+		const lineHeight = Math.round(fontSize * 1.3);
+		return {
+			width: Math.max(Math.ceil(maxWidth + 8), 40),
+			height: Math.max(lines.length * lineHeight, 28)
+		};
+	}
+
+	setFontFamily(family: string) {
+		this.fontFamily = family;
+		this.onFontFamilyChanged?.(family);
+
+		const targetIds = new Set(this.selectedIds);
+		if (this.editingShapeId) {
+			targetIds.add(this.editingShapeId);
+		}
+
+		const textShapes: ShapeRecord[] = [];
+		for (const id of targetIds) {
+			const shape = this.shapes.get(id);
+			if (shape && shape.type === 'text') {
+				textShapes.push(shape);
+			}
+		}
+
+		if (textShapes.length > 0) {
+			const before: ShapeRecord[] = [];
+			const modified: ShapeRecord[] = [];
+			const now = Date.now();
+
+			for (const shape of textShapes) {
+				before.push({ ...shape, data: { ...shape.data } });
+				const nextData = {
+					...shape.data,
+					fontFamily: family
+				};
+				const fontSize = nextData.fontSize || this.fontSize;
+				const text = nextData.text || '';
+				const bounds = this.calculateTextBounds(text, fontSize, family);
+
+				const updated: ShapeRecord = {
+					...shape,
+					width: bounds.width,
+					height: bounds.height,
+					data: nextData,
+					updatedAt: now
+				};
+				this.shapes.set(shape.id, updated);
+				modified.push(updated);
+
+				if (this.editingShapeId === shape.id) {
+					this.onTextShapeStyleChanged?.(updated);
+				}
+			}
+
+			this.onShapesMutated?.(modified);
+			this.onActionRecorded?.({
+				type: 'modify',
+				before,
+				after: modified
+			});
+			this.renderBuffer();
+			this.renderOverlay();
+		}
+	}
+
+	setFontSize(size: number) {
+		this.fontSize = size;
+		this.onFontSizeChanged?.(size);
+
+		const targetIds = new Set(this.selectedIds);
+		if (this.editingShapeId) {
+			targetIds.add(this.editingShapeId);
+		}
+
+		const textShapes: ShapeRecord[] = [];
+		for (const id of targetIds) {
+			const shape = this.shapes.get(id);
+			if (shape && shape.type === 'text') {
+				textShapes.push(shape);
+			}
+		}
+
+		if (textShapes.length > 0) {
+			const before: ShapeRecord[] = [];
+			const modified: ShapeRecord[] = [];
+			const now = Date.now();
+
+			for (const shape of textShapes) {
+				before.push({ ...shape, data: { ...shape.data } });
+				const nextData = {
+					...shape.data,
+					fontSize: size
+				};
+				const family = nextData.fontFamily || this.fontFamily;
+				const text = nextData.text || '';
+				const bounds = this.calculateTextBounds(text, size, family);
+
+				const updated: ShapeRecord = {
+					...shape,
+					width: bounds.width,
+					height: bounds.height,
+					data: nextData,
+					updatedAt: now
+				};
+				this.shapes.set(shape.id, updated);
+				modified.push(updated);
+
+				if (this.editingShapeId === shape.id) {
+					this.onTextShapeStyleChanged?.(updated);
+				}
+			}
+
+			this.onShapesMutated?.(modified);
+			this.onActionRecorded?.({
+				type: 'modify',
+				before,
+				after: modified
+			});
+			this.renderBuffer();
+			this.renderOverlay();
+		}
+	}
+
 	private applyPropertyToSelection(props: Partial<ShapeRecord>) {
 		if (this.selectedIds.length === 0) return;
 		const before: ShapeRecord[] = [];
@@ -196,12 +407,13 @@ export class CanvasEngine {
 		for (const id of this.selectedIds) {
 			const shape = this.shapes.get(id);
 			if (shape) {
-				before.push({ ...shape });
+				before.push({ ...shape, data: shape.data ? { ...shape.data } : undefined });
 				const updated: ShapeRecord = {
 					...shape,
 					...props,
 					updatedAt: now
 				};
+				this.shapes.set(id, updated);
 				modified.push(updated);
 			}
 		}
@@ -213,6 +425,8 @@ export class CanvasEngine {
 				before,
 				after: modified
 			});
+			this.renderBuffer();
+			this.renderOverlay();
 		}
 	}
 
@@ -341,17 +555,19 @@ export class CanvasEngine {
 			const hit = sortedShapes.find((s) => hitTestShape(worldPos, s));
 
 			if (hit) {
+				let nextSelected = [...this.selectedIds];
 				if (e.shiftKey) {
-					if (this.selectedIds.includes(hit.id)) {
-						this.selectedIds = this.selectedIds.filter((id) => id !== hit.id);
+					if (nextSelected.includes(hit.id)) {
+						nextSelected = nextSelected.filter((id) => id !== hit.id);
 					} else {
-						this.selectedIds.push(hit.id);
+						nextSelected.push(hit.id);
 					}
 				} else {
-					if (!this.selectedIds.includes(hit.id)) {
-						this.selectedIds = [hit.id];
+					if (!nextSelected.includes(hit.id)) {
+						nextSelected = [hit.id];
 					}
 				}
+				this.setSelectedIds(nextSelected);
 
 				this.interactionType = 'drag_selection';
 				this.dragInitialPositions.clear();
@@ -365,12 +581,11 @@ export class CanvasEngine {
 				}
 			} else {
 				if (!e.shiftKey) {
-					this.selectedIds = [];
+					this.setSelectedIds([]);
 				}
 				this.interactionType = 'marquee';
 			}
 
-			this.onSelectionChanged?.(this.selectedIds);
 			this.renderOverlay();
 		}
 	}
@@ -488,8 +703,7 @@ export class CanvasEngine {
 				}
 			}
 
-			this.selectedIds = insideIds;
-			this.onSelectionChanged?.(this.selectedIds);
+			this.setSelectedIds(insideIds);
 			this.renderOverlay();
 		}
 	}
@@ -629,8 +843,7 @@ export class CanvasEngine {
 			this.renderBuffer();
 
 			if (shapeType === 'sticky_note') {
-				this.selectedIds = [shape.id];
-				this.onSelectionChanged?.(this.selectedIds);
+				this.setSelectedIds([shape.id]);
 				this.startTextEdit(shape);
 			}
 		} else if (this.interactionType === 'create_text') {
@@ -710,8 +923,7 @@ export class CanvasEngine {
 			}
 		}
 
-		this.selectedIds = [];
-		this.onSelectionChanged?.(this.selectedIds);
+		this.setSelectedIds([]);
 		this.onShapesDeleted?.(toDelete);
 
 		if (shapesToDelete.length > 0) {
@@ -734,8 +946,7 @@ export class CanvasEngine {
 	deleteShapeById(id: string) {
 		const shape = this.shapes.get(id);
 		this.shapes.delete(id);
-		this.selectedIds = this.selectedIds.filter((sid) => sid !== id);
-		this.onSelectionChanged?.(this.selectedIds);
+		this.setSelectedIds(this.selectedIds.filter((sid) => sid !== id));
 		this.onShapesDeleted?.([id]);
 		if (shape) {
 			this.onActionRecorded?.({
@@ -778,8 +989,7 @@ export class CanvasEngine {
 		if (hit && (hit.type === 'sticky_note' || hit.type === 'text')) {
 			this.isInteracting = false;
 			this.interactionType = null;
-			this.selectedIds = [hit.id];
-			this.onSelectionChanged?.(this.selectedIds);
+			this.setSelectedIds([hit.id]);
 			this.startTextEdit(hit);
 		}
 	}
@@ -823,13 +1033,13 @@ export class CanvasEngine {
 			x: worldPos.x,
 			y: worldPos.y,
 			width: 140,
-			height: 32,
+			height: Math.max(Math.round(this.fontSize * 1.3), 32),
 			fill: 'transparent',
 			stroke: this.strokeColor,
 			strokeWidth: 1,
 			rotation: 0,
 			zIndex: this.getNextZIndex(),
-			data: { text: '', fontSize: this.fontSize },
+			data: { text: '', fontSize: this.fontSize, fontFamily: this.fontFamily },
 			createdBy: '',
 			updatedAt: now
 		};
@@ -837,8 +1047,7 @@ export class CanvasEngine {
 		this.shapes.set(shape.id, shape);
 		this.onShapesMutated?.([shape]);
 		this.onActionRecorded?.({ type: 'create', shape });
-		this.selectedIds = [shape.id];
-		this.onSelectionChanged?.(this.selectedIds);
+		this.setSelectedIds([shape.id]);
 		this.startTextEdit(shape);
 	}
 
@@ -1097,7 +1306,8 @@ export class CanvasEngine {
 				const text = shape.data?.text || '';
 				if (text) {
 					const fSize = shape.data?.fontSize || 18;
-					ctx.font = `${fSize}px system-ui, -apple-system, sans-serif`;
+					const fFamily = getFontFamilyCss(shape.data?.fontFamily || 'sans');
+					ctx.font = `${fSize}px ${fFamily}`;
 					ctx.fillStyle = shape.stroke || '#f4f4f5';
 					ctx.textBaseline = 'top';
 					const lineHeight = Math.round(fSize * 1.3);
@@ -1369,8 +1579,9 @@ export class CanvasEngine {
 			} else if (shape.type === 'text') {
 				const text = shape.data?.text || '';
 				const fSize = shape.data?.fontSize || 18;
+				const fFamily = getFontFamilySvg(shape.data?.fontFamily || 'sans');
 				const lines = text.split('\n');
-				svgContent += `<text x="${shape.x}" y="${shape.y + fSize}" font-family="system-ui, sans-serif" font-size="${fSize}" fill="${shape.stroke}">\n`;
+				svgContent += `<text x="${shape.x}" y="${shape.y + fSize}" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
 				for (let i = 0; i < lines.length; i++) {
 					const dy = i === 0 ? '0' : '1.3em';
 					svgContent += `<tspan x="${shape.x}" dy="${dy}">${this.escapeXml(lines[i])}</tspan>\n`;
