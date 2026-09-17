@@ -104,6 +104,16 @@
 <main
 	class="landing-dots relative flex min-h-screen w-full flex-col items-center justify-center bg-(--surface-0) p-6 text-(--ink-1)"
 >
+	<!-- Top Left Back to Landing Link -->
+	<a
+		href="https://mesh.asy.web.id"
+		class="fixed top-4 left-4 z-20 flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface-1) py-1.5 pr-3.5 pl-3 font-mono text-xs font-semibold text-(--ink-2) shadow-lg backdrop-blur-md transition-all select-none hover:scale-105 hover:border-[#6366f1] hover:text-(--ink-1) focus:outline-none"
+		title="Back to Mesh Landing Page & Showcase"
+	>
+		<span>←</span>
+		<span>mesh.asy.web.id</span>
+	</a>
+
 	<a
 		href="https://github.com/VUXXE/Mesh"
 		target="_blank"
