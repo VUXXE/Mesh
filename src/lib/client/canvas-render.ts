@@ -1,4 +1,4 @@
-import { screenToWorld } from './math';
+import { getResizeHandles, getShapeBounds, isResizableShape, screenToWorld } from './math';
 import { getFontFamilyCss, wrapText } from './canvas-text';
 import type { PathPoint, PeerPresence, ShapeRecord } from '../types';
 
@@ -222,5 +222,184 @@ export function renderGrid(
 			ctx.fillRect(x, y, 1.5, 1.5);
 		}
 	}
+	ctx.restore();
+}
+
+export function calculateLineEndPoint(
+	start: { x: number; y: number },
+	current: { x: number; y: number },
+	snap: boolean
+): { x: number; y: number } {
+	if (!snap) return current;
+	const dx = current.x - start.x;
+	const dy = current.y - start.y;
+	const dist = Math.sqrt(dx * dx + dy * dy);
+	let angle = Math.atan2(dy, dx);
+	const snapInterval = Math.PI / 4;
+	angle = Math.round(angle / snapInterval) * snapInterval;
+	return {
+		x: start.x + dist * Math.cos(angle),
+		y: start.y + dist * Math.sin(angle)
+	};
+}
+
+export function drawActiveStroke(
+	ctx: CanvasRenderingContext2D,
+	points: PathPoint[],
+	strokeColor: string,
+	strokeWidth: number
+) {
+	if (points.length <= 1) return;
+
+	ctx.beginPath();
+	ctx.strokeStyle = strokeColor;
+	ctx.lineWidth = strokeWidth;
+	ctx.lineCap = 'round';
+	ctx.lineJoin = 'round';
+
+	ctx.moveTo(points[0].x, points[0].y);
+	for (let i = 1; i < points.length; i++) {
+		ctx.lineTo(points[i].x, points[i].y);
+	}
+	ctx.stroke();
+}
+
+export function drawLinePreview(
+	ctx: CanvasRenderingContext2D,
+	startPoint: { x: number; y: number },
+	currentPoint: { x: number; y: number },
+	strokeColor: string,
+	strokeWidth: number,
+	isArrow: boolean,
+	isShiftPressed: boolean
+) {
+	const end = calculateLineEndPoint(startPoint, currentPoint, isShiftPressed);
+
+	ctx.save();
+	ctx.strokeStyle = strokeColor;
+	ctx.fillStyle = strokeColor;
+	ctx.lineWidth = strokeWidth;
+	ctx.lineCap = 'round';
+	ctx.lineJoin = 'round';
+
+	ctx.beginPath();
+	ctx.moveTo(startPoint.x, startPoint.y);
+	ctx.lineTo(end.x, end.y);
+	ctx.stroke();
+
+	if (isArrow) {
+		drawArrowHead(ctx, startPoint.x, startPoint.y, end.x, end.y, strokeColor, strokeWidth);
+	}
+	ctx.restore();
+}
+
+export function drawShapePreview(
+	ctx: CanvasRenderingContext2D,
+	startPoint: { x: number; y: number },
+	currentPoint: { x: number; y: number },
+	tool: string,
+	strokeColor: string,
+	fillColor: string,
+	strokeWidth: number
+) {
+	const x = Math.min(startPoint.x, currentPoint.x);
+	const y = Math.min(startPoint.y, currentPoint.y);
+	const w = Math.abs(currentPoint.x - startPoint.x);
+	const h = Math.abs(currentPoint.y - startPoint.y);
+
+	ctx.save();
+	ctx.strokeStyle = tool === 'sticky_note' ? '#eab308' : strokeColor;
+	ctx.fillStyle = tool === 'sticky_note' ? 'rgba(254, 240, 138, 0.4)' : fillColor;
+	ctx.lineWidth = strokeWidth;
+
+	if (tool === 'sticky_note') {
+		ctx.beginPath();
+		ctx.roundRect(x, y, w, h, 6);
+		ctx.fill();
+		ctx.stroke();
+	} else if (tool === 'rectangle') {
+		ctx.beginPath();
+		ctx.rect(x, y, w, h);
+		if (fillColor !== 'transparent') ctx.fill();
+		ctx.stroke();
+	} else if (tool === 'ellipse') {
+		ctx.beginPath();
+		ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+		if (fillColor !== 'transparent') ctx.fill();
+		ctx.stroke();
+	}
+	ctx.restore();
+}
+
+export function drawSelectionOutline(
+	ctx: CanvasRenderingContext2D,
+	selectedIds: string[],
+	shapes: Map<string, ShapeRecord>,
+	zoom: number,
+	editingShapeId?: string | null
+) {
+	if (selectedIds.length === 0) return;
+
+	const isSingleSelection = selectedIds.length === 1;
+	const singleShape = isSingleSelection ? shapes.get(selectedIds[0]) : null;
+	const canResizeSingle =
+		singleShape && isResizableShape(singleShape.type) && editingShapeId !== singleShape.id;
+
+	for (const id of selectedIds) {
+		const shape = shapes.get(id);
+		if (shape) {
+			const b = getShapeBounds(shape);
+			ctx.save();
+			ctx.strokeStyle = '#6366f1';
+			ctx.lineWidth = 1.5 / zoom;
+			ctx.setLineDash([4 / zoom, 4 / zoom]);
+			if (canResizeSingle) {
+				ctx.strokeRect(b.minX, b.minY, b.width, b.height);
+			} else {
+				ctx.strokeRect(b.minX - 4, b.minY - 4, b.width + 8, b.height + 8);
+			}
+			ctx.restore();
+		}
+	}
+
+	if (canResizeSingle && singleShape) {
+		const b = getShapeBounds(singleShape);
+		const handles = getResizeHandles(b);
+
+		const handleSize = 8 / zoom;
+		const halfSize = handleSize / 2;
+
+		ctx.save();
+		ctx.fillStyle = '#ffffff';
+		ctx.strokeStyle = '#6366f1';
+		ctx.lineWidth = 1.5 / zoom;
+		ctx.setLineDash([]);
+
+		for (const pos of Object.values(handles)) {
+			ctx.beginPath();
+			ctx.fillRect(pos.x - halfSize, pos.y - halfSize, handleSize, handleSize);
+			ctx.strokeRect(pos.x - halfSize, pos.y - halfSize, handleSize, handleSize);
+		}
+		ctx.restore();
+	}
+}
+
+export function drawMarqueeBox(
+	ctx: CanvasRenderingContext2D,
+	startPoint: { x: number; y: number },
+	currentPoint: { x: number; y: number },
+	zoom: number
+) {
+	const minX = Math.min(startPoint.x, currentPoint.x);
+	const minY = Math.min(startPoint.y, currentPoint.y);
+	const w = Math.abs(currentPoint.x - startPoint.x);
+	const h = Math.abs(currentPoint.y - startPoint.y);
+
+	ctx.save();
+	ctx.strokeStyle = '#6366f1';
+	ctx.fillStyle = 'rgba(99, 102, 241, 0.08)';
+	ctx.lineWidth = 1 / zoom;
+	ctx.fillRect(minX, minY, w, h);
+	ctx.strokeRect(minX, minY, w, h);
 	ctx.restore();
 }
