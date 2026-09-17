@@ -99,12 +99,12 @@
 <div class="fixed top-4 right-4 z-20 flex items-center gap-2 select-none">
 	<!-- Room ID & Copy Options Pill -->
 	<div
-		class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 py-1.5 shadow-lg backdrop-blur-md"
+		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 shadow-lg backdrop-blur-md"
 	>
 		<span class="text-xs text-(--ink-2)">Room:</span>
 		{#if locked}
 			<svg
-				class="h-3.5 w-3.5 text-amber-300"
+				class="h-3.5 w-3.5 shrink-0 text-amber-300"
 				viewBox="0 0 24 24"
 				fill="none"
 				stroke="currentColor"
@@ -125,7 +125,7 @@
 		<div class="mx-0.5 h-3.5 w-px bg-(--surface-2)"></div>
 		<button
 			onclick={copyRoomCode}
-			class="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copiedCode
+			class="flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors focus:outline-none {copiedCode
 				? 'bg-emerald-500/20 text-emerald-300'
 				: 'bg-(--surface-2) text-(--ink-2) hover:text-(--ink-1)'}"
 			title="Copy room code only ({roomId})"
@@ -134,7 +134,7 @@
 		</button>
 		<button
 			onclick={copyRoomLink}
-			class="rounded px-1.5 py-0.5 text-[11px] font-medium transition-colors focus:outline-none {copiedLink
+			class="flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors focus:outline-none {copiedLink
 				? 'bg-emerald-500/20 text-emerald-300'
 				: 'bg-(--surface-2) text-(--ink-2) hover:text-(--ink-1)'}"
 			title="Copy full invite link"
@@ -146,7 +146,7 @@
 	<!-- Theme Toggle -->
 	<button
 		onclick={toggleTheme}
-		class="flex items-center rounded-lg border border-(--surface-2) bg-(--surface-1) p-2 text-(--ink-2) shadow-lg backdrop-blur-md transition-colors hover:text-(--ink-1) focus:outline-none"
+		class="flex h-9 w-9 items-center justify-center rounded-lg border border-(--surface-2) bg-(--surface-1) text-(--ink-2) shadow-lg backdrop-blur-md transition-colors hover:text-(--ink-1) focus:outline-none"
 		title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
 		aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
 	>
@@ -171,41 +171,44 @@
 
 	<!-- Connection Status Indicator -->
 	<div
-		class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 py-1.5 shadow-lg backdrop-blur-md"
+		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 shadow-lg backdrop-blur-md"
 	>
 		{#if status === 'connected'}
-			<span class="h-2 w-2 rounded-full bg-emerald-500" title="Connected"></span>
+			<span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Connected"></span>
 			<span class="text-xs font-medium text-emerald-400">Live</span>
 		{:else if status === 'connecting' || status === 'reconnecting'}
-			<span class="h-2 w-2 animate-pulse rounded-full bg-amber-500" title="Connecting..."></span>
+			<span class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" title="Connecting..."
+			></span>
 			<span class="text-xs font-medium text-amber-400">Reconnecting...</span>
 		{:else}
-			<span class="h-2 w-2 rounded-full bg-rose-500" title="Disconnected"></span>
+			<span class="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="Disconnected"></span>
 			<span class="text-xs font-medium text-rose-400">Offline</span>
 		{/if}
 	</div>
 
 	<!-- Peers & User Pill -->
 	<div
-		class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2 py-1.5 shadow-lg backdrop-blur-md"
+		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 shadow-lg backdrop-blur-md"
 	>
 		<!-- Connected Peer Avatars -->
-		<div class="flex items-center -space-x-1.5 overflow-hidden">
-			{#each peers as peer (peer.userId)}
-				<div
-					class="flex h-6 w-6 cursor-help items-center justify-center rounded-full border-2 border-(--surface-1) text-[10px] font-bold text-black shadow-sm"
-					style="background-color: {peer.color};"
-					title={peer.name}
-				>
-					{getInitials(peer.name)}
-				</div>
-			{/each}
-		</div>
+		{#if peers.length > 0}
+			<div class="flex items-center -space-x-1.5 overflow-hidden">
+				{#each peers as peer (peer.userId)}
+					<div
+						class="flex h-6 w-6 shrink-0 cursor-help items-center justify-center rounded-full border-2 border-(--surface-1) text-[10px] font-bold text-black shadow-sm"
+						style="background-color: {peer.color};"
+						title={peer.name}
+					>
+						{getInitials(peer.name)}
+					</div>
+				{/each}
+			</div>
+		{/if}
 
 		<!-- Local Current User Pill -->
-		<div class="flex items-center gap-1.5 pl-1">
+		<div class="flex items-center gap-1.5 {peers.length > 0 ? 'pl-0.5' : ''}">
 			<div
-				class="flex h-6 w-6 items-center justify-center rounded-full border border-white/20 text-[10px] font-bold text-black"
+				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/20 text-[10px] font-bold text-black"
 				style="background-color: {currentUser.color};"
 			>
 				{getInitials(currentUser.name)}
@@ -217,7 +220,7 @@
 					bind:value={nameInput}
 					onblur={saveName}
 					onkeydown={handleKeyDown}
-					class="w-24 rounded border border-[#6366f1] bg-(--surface-2) px-1.5 py-0.5 text-xs text-(--ink-1) focus:outline-none"
+					class="h-6 w-24 rounded border border-[#6366f1] bg-(--surface-2) px-1.5 text-xs text-(--ink-1) focus:outline-none"
 				/>
 			{:else}
 				<button
