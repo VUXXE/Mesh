@@ -3,7 +3,7 @@ FROM oven/bun:1-debian AS builder
 WORKDIR /app
 
 # Install dependencies using bun
-COPY package.json bun.lockb* ./
+COPY package.json bun.lock* ./
 RUN bun install --frozen-lockfile || bun install
 
 # Copy source tree and compile assets + worker bundle
