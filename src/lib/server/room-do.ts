@@ -30,9 +30,11 @@ interface PeerAttachment {
 
 const MIN_PASSWORD_LENGTH = 4;
 const MAX_PASSWORD_LENGTH = 128;
+const VALID_SHAPE_TYPES = new Set(['path', 'rectangle', 'ellipse', 'text', 'sticky_note']);
 
 export class WhiteboardRoom extends DurableObject {
 	private rateLimits = new Map<WebSocket, { count: number; resetAt: number }>();
+	private authFailures = new Map<WebSocket, { failures: number; lockedUntil: number }>();
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -72,9 +74,26 @@ export class WhiteboardRoom extends DurableObject {
 			return new Response('Expected WebSocket upgrade', { status: 426 });
 		}
 
-		const activeSockets = this.ctx.getWebSockets();
+		let activeSockets = this.ctx.getWebSockets();
+		const passwordSet = this.hasPassword();
+
 		if (activeSockets.length >= 50) {
-			return new Response('Room full (max 50 users)', { status: 503 });
+			// If room is locked and full, prune an unauthenticated socket to let authenticating users connect
+			if (passwordSet) {
+				const unauthedSocket = activeSockets.find((s) => !this.isAuthed(s));
+				if (unauthedSocket) {
+					try {
+						unauthedSocket.close(4001, 'Evicted for incoming connection');
+						this.cleanupSocket(unauthedSocket);
+					} catch {
+						// Socket may already be closed
+					}
+					activeSockets = this.ctx.getWebSockets();
+				}
+			}
+			if (activeSockets.length >= 50) {
+				return new Response('Room full (max 50 users)', { status: 503 });
+			}
 		}
 
 		const pair = new WebSocketPair();
@@ -86,7 +105,6 @@ export class WhiteboardRoom extends DurableObject {
 		const roomIdMatch = url.pathname.match(/\/api\/room\/([^/]+)\/ws/);
 		const roomId = roomIdMatch ? roomIdMatch[1] : 'unknown';
 
-		const passwordSet = this.hasPassword();
 		const shapes = passwordSet ? [] : this.getAllShapes();
 		const peers = passwordSet ? [] : this.getActivePeers();
 
@@ -100,6 +118,20 @@ export class WhiteboardRoom extends DurableObject {
 		};
 
 		server.send(JSON.stringify(initMsg));
+
+		// Impose a 15-second auth timeout on newly connected sockets in password-protected rooms
+		if (passwordSet) {
+			setTimeout(() => {
+				try {
+					if (!this.isAuthed(server)) {
+						server.close(4001, 'Authentication timeout');
+						this.cleanupSocket(server);
+					}
+				} catch {
+					// Socket might already be closed
+				}
+			}, 15000);
+		}
 
 		return new Response(null, {
 			status: 101,
@@ -152,16 +184,35 @@ export class WhiteboardRoom extends DurableObject {
 			case 'room:auth': {
 				if (!this.hasPassword()) {
 					this.markAuthed(ws);
+					this.authFailures.delete(ws);
 					ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
 					this.sendFullSync(ws);
 					break;
 				}
+
+				const failState = this.authFailures.get(ws);
+				if (failState && Date.now() < failState.lockedUntil) {
+					ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
+					return;
+				}
+
 				const ok = await this.verifyPassword(payload.password ?? '');
 				if (ok) {
+					this.authFailures.delete(ws);
 					this.markAuthed(ws);
 					ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
 					this.sendFullSync(ws);
 				} else {
+					const count = (failState?.failures ?? 0) + 1;
+					if (count >= 10) {
+						ws.close(1008, 'Too many failed authentication attempts');
+						this.cleanupSocket(ws);
+						return;
+					} else if (count >= 5) {
+						this.authFailures.set(ws, { failures: count, lockedUntil: Date.now() + 5000 });
+					} else {
+						this.authFailures.set(ws, { failures: count, lockedUntil: 0 });
+					}
 					ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
 				}
 				break;
@@ -180,7 +231,12 @@ export class WhiteboardRoom extends DurableObject {
 				await this.setPassword(pw);
 				this.markAuthed(ws);
 				ws.send(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage));
-				this.broadcast(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage), ws);
+				// Broadcast notification to peers with requireAuth = false so they know password is required
+				this.broadcast(
+					JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage),
+					ws,
+					false
+				);
 				this.sendFullSync(ws);
 				break;
 			}
@@ -254,41 +310,64 @@ export class WhiteboardRoom extends DurableObject {
 				`;
 
 				const appliedShapes: ShapeRecord[] = [];
+				const now = Date.now();
+				const maxAllowedTime = now + 5000; // Allow max 5s clock skew
 
-				this.ctx.storage.transactionSync(() => {
-					for (const s of payload.shapes) {
-						const dataStr = s.data !== undefined ? JSON.stringify(s.data) : null;
-						this.ctx.storage.sql.exec(
-							upsertStmt,
-							s.id,
-							s.type,
-							s.x ?? 0.0,
-							s.y ?? 0.0,
-							s.width ?? 0.0,
-							s.height ?? 0.0,
-							s.fill ?? 'transparent',
-							s.stroke ?? '#000000',
-							s.strokeWidth ?? 2.0,
-							s.rotation ?? 0.0,
-							s.zIndex ?? 0,
-							dataStr,
-							senderUserId,
-							s.updatedAt
-						);
+				try {
+					this.ctx.storage.transactionSync(() => {
+						for (const s of payload.shapes) {
+							if (!s || typeof s.id !== 'string' || !s.id || !VALID_SHAPE_TYPES.has(s.type)) {
+								continue;
+							}
+							const safeUpdatedAt =
+								typeof s.updatedAt === 'number' && Number.isFinite(s.updatedAt) && s.updatedAt > 0
+									? Math.min(s.updatedAt, maxAllowedTime)
+									: now;
 
-						// Read back the committed shape to confirm LWW won
-						const updatedRow = this.ctx.storage.sql
-							.exec<RawShapeRow>(
-								'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes WHERE id = ?',
-								s.id
-							)
-							.one();
+							let dataStr: string | null = null;
+							if (s.data !== undefined) {
+								try {
+									dataStr = JSON.stringify(s.data);
+								} catch {
+									dataStr = null;
+								}
+							}
 
-						if (updatedRow && updatedRow.updated_at === s.updatedAt) {
-							appliedShapes.push(this.rowToShape(updatedRow));
+							this.ctx.storage.sql.exec(
+								upsertStmt,
+								s.id,
+								s.type,
+								Number.isFinite(s.x) ? s.x : 0.0,
+								Number.isFinite(s.y) ? s.y : 0.0,
+								Number.isFinite(s.width) ? s.width : 0.0,
+								Number.isFinite(s.height) ? s.height : 0.0,
+								typeof s.fill === 'string' ? s.fill : 'transparent',
+								typeof s.stroke === 'string' ? s.stroke : '#000000',
+								Number.isFinite(s.strokeWidth) ? s.strokeWidth : 2.0,
+								Number.isFinite(s.rotation) ? s.rotation : 0.0,
+								Number.isInteger(s.zIndex) ? s.zIndex : 0,
+								dataStr,
+								senderUserId,
+								safeUpdatedAt
+							);
+
+							// Read back the committed shape to confirm LWW won
+							const updatedRow = this.ctx.storage.sql
+								.exec<RawShapeRow>(
+									'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes WHERE id = ?',
+									s.id
+								)
+								.one();
+
+							if (updatedRow && updatedRow.updated_at === safeUpdatedAt) {
+								appliedShapes.push(this.rowToShape(updatedRow));
+							}
 						}
-					}
-				});
+					});
+				} catch (err) {
+					console.error('Failed to commit shape:upsert transaction:', err);
+					return;
+				}
 
 				if (appliedShapes.length > 0) {
 					const broadcastMsg: S2CMessage = {
@@ -309,15 +388,23 @@ export class WhiteboardRoom extends DurableObject {
 					return;
 				}
 
-				this.ctx.storage.transactionSync(() => {
-					for (const id of payload.ids) {
-						this.ctx.storage.sql.exec('DELETE FROM shapes WHERE id = ?', id);
-					}
-				});
+				const validIds = payload.ids.filter((id) => typeof id === 'string' && id.length > 0);
+				if (validIds.length === 0) return;
+
+				try {
+					this.ctx.storage.transactionSync(() => {
+						for (const id of validIds) {
+							this.ctx.storage.sql.exec('DELETE FROM shapes WHERE id = ?', id);
+						}
+					});
+				} catch (err) {
+					console.error('Failed to delete shapes:', err);
+					return;
+				}
 
 				const broadcastMsg: S2CMessage = {
 					type: 'shapes:deleted',
-					ids: payload.ids
+					ids: validIds
 				};
 				this.broadcast(JSON.stringify(broadcastMsg));
 				break;
@@ -328,7 +415,12 @@ export class WhiteboardRoom extends DurableObject {
 					return;
 				}
 
-				this.ctx.storage.sql.exec('DELETE FROM shapes');
+				try {
+					this.ctx.storage.sql.exec('DELETE FROM shapes');
+				} catch (err) {
+					console.error('Failed to clear canvas:', err);
+					return;
+				}
 
 				const broadcastMsg: S2CMessage = {
 					type: 'canvas:cleared'
@@ -345,7 +437,7 @@ export class WhiteboardRoom extends DurableObject {
 		reason: string,
 		wasClean: boolean
 	): Promise<void> {
-		this.rateLimits.delete(ws);
+		this.cleanupSocket(ws);
 		const attachment = ws.deserializeAttachment() as PeerAttachment | null;
 		if (attachment?.userId) {
 			const leftMsg: S2CMessage = {
@@ -357,12 +449,17 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	async webSocketError(ws: WebSocket, error: unknown): Promise<void> {
-		this.rateLimits.delete(ws);
+		this.cleanupSocket(ws);
 		try {
 			ws.close(1011, 'Internal server error');
 		} catch {
 			// Ignore socket close errors
 		}
+	}
+
+	private cleanupSocket(ws: WebSocket): void {
+		this.rateLimits.delete(ws);
+		this.authFailures.delete(ws);
 	}
 
 	private getMeta(key: string): string | null {
@@ -403,11 +500,25 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	private async hashPassword(password: string, salt: string): Promise<string> {
-		const digest = await crypto.subtle.digest(
-			'SHA-256',
-			new TextEncoder().encode(`${salt}:${password}`)
+		const enc = new TextEncoder();
+		const keyMaterial = await crypto.subtle.importKey(
+			'raw',
+			enc.encode(password),
+			{ name: 'PBKDF2' },
+			false,
+			['deriveBits']
 		);
-		return Array.from(new Uint8Array(digest))
+		const derivedBits = await crypto.subtle.deriveBits(
+			{
+				name: 'PBKDF2',
+				salt: enc.encode(salt),
+				iterations: 100000,
+				hash: 'SHA-256'
+			},
+			keyMaterial,
+			256
+		);
+		return Array.from(new Uint8Array(derivedBits))
 			.map((b) => b.toString(16).padStart(2, '0'))
 			.join('');
 	}
@@ -447,10 +558,14 @@ export class WhiteboardRoom extends DurableObject {
 		ws.send(JSON.stringify(fullInit));
 	}
 
-	private broadcast(message: string, excludeWs?: WebSocket): void {
+	private broadcast(message: string, excludeWs?: WebSocket, requireAuth = true): void {
+		const locked = this.hasPassword();
 		const sockets = this.ctx.getWebSockets();
 		for (const socket of sockets) {
 			if (socket !== excludeWs) {
+				if (locked && requireAuth && !this.isAuthed(socket)) {
+					continue;
+				}
 				try {
 					socket.send(message);
 				} catch {

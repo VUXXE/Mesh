@@ -248,11 +248,15 @@ export class RoomSocket {
 
 			case 'room:password_set': {
 				this.authRequired = true;
-				this.authed = true;
-				this.authError = '';
 				if (this.pendingPassword) {
+					this.authed = true;
+					this.authError = '';
 					this.storePassword(this.pendingPassword);
 					this.pendingPassword = null;
+				} else {
+					// Password was set by another collaborator; require authentication
+					this.authed = false;
+					this.authError = '';
 				}
 				break;
 			}
