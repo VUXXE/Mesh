@@ -29,10 +29,5 @@ vite.config.ts.timestamp-*
 !readme.md
 skills/
 
-# Portfolio assets and scripts
-portfolio/
-scripts/portfolio-*.ts
-scripts/seed-portfolio.ts
-
 # Raw unoptimized assets
 MESHY.png
