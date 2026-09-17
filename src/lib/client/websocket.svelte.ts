@@ -18,12 +18,15 @@ export class RoomSocket {
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	private isExplicitlyClosed = false;
 
-	// Throttling for cursor (30Hz = ~33ms, PRD §4.2, §8.1)
+	// Throttling for cursor (PRD §4.2, §8.1: max 30Hz; optimized to ~15Hz for Cloudflare free-tier quota)
+	private static readonly PRESENCE_INTERVAL_MS = 66; // ~15Hz adaptive presence
 	private lastPresenceTime = 0;
 	private pendingPresenceTimer: ReturnType<typeof setTimeout> | null = null;
 	private pendingCursor: { x: number; y: number } | null = null;
 	private pendingSelectedIds: string[] = [];
 	private pendingPassword: string | null = null;
+	private lastSentCursor: { x: number; y: number } | null = null;
+	private lastSentSelectedIds: string[] = [];
 
 	// Svelte 5 reactive states
 	status = $state<ConnectionStatus>('connecting');
@@ -224,8 +227,12 @@ export class RoomSocket {
 				}
 				this.shapes = map;
 
+				const hadNoPeers = this.peers.length === 0;
 				// Update active peers, excluding ourselves
 				this.peers = msg.peers.filter((p) => p.userId !== this.currentUser.userId);
+				if (hadNoPeers && this.peers.length > 0) {
+					this.sendPresenceImmediate(this.pendingCursor, this.pendingSelectedIds);
+				}
 				break;
 			}
 
@@ -264,6 +271,7 @@ export class RoomSocket {
 			case 'presence:peer': {
 				if (msg.userId === this.currentUser.userId) return;
 
+				const hadNoPeers = this.peers.length === 0;
 				const idx = this.peers.findIndex((p) => p.userId === msg.userId);
 				const updatedPeer: PeerPresence = {
 					userId: msg.userId,
@@ -278,11 +286,19 @@ export class RoomSocket {
 				} else {
 					this.peers.push(updatedPeer);
 				}
+
+				if (hadNoPeers) {
+					this.sendPresenceImmediate(this.pendingCursor, this.pendingSelectedIds);
+				}
 				break;
 			}
 
 			case 'peer:left': {
 				this.peers = this.peers.filter((p) => p.userId !== msg.userId);
+				if (this.peers.length === 0 && this.pendingPresenceTimer) {
+					clearTimeout(this.pendingPresenceTimer);
+					this.pendingPresenceTimer = null;
+				}
 				break;
 			}
 
@@ -316,27 +332,53 @@ export class RoomSocket {
 	}
 
 	/**
-	 * Broadcast cursor position and selected shape IDs at 30Hz throttle.
+	 * Broadcast cursor position and selected shape IDs.
+	 * Optimizations for Cloudflare Workers Free Tier quota:
+	 * 1. Solo room suppression: If no other peers are in the room, skip continuous cursor broadcasts.
+	 * 2. Deadband: Skip sending if cursor movement is < 2px and selection has not changed.
+	 * 3. Adaptive throttling: Caps frequency at 15Hz (66ms) instead of 30Hz, saving 50% invocations during active collaboration.
 	 */
 	sendPresence(cursor: { x: number; y: number } | null, selectedIds: string[]) {
 		this.pendingCursor = cursor;
 		this.pendingSelectedIds = selectedIds;
 
+		// Solo room suppression: If no other collaborators are in the room, do not stream cursor movements
+		if (this.peers.length === 0 && cursor !== null) {
+			return;
+		}
+
+		// Deadband check: if cursor moved less than 2px and selection is identical, skip transmission
+		if (cursor !== null && this.lastSentCursor !== null) {
+			const dx = cursor.x - this.lastSentCursor.x;
+			const dy = cursor.y - this.lastSentCursor.y;
+			const distSq = dx * dx + dy * dy;
+			const selectionUnchanged =
+				selectedIds.length === this.lastSentSelectedIds.length &&
+				selectedIds.every((id, idx) => id === this.lastSentSelectedIds[idx]);
+
+			if (distSq < 4 && selectionUnchanged) {
+				return;
+			}
+		}
+
 		const now = Date.now();
 		const timeSinceLast = now - this.lastPresenceTime;
 
-		if (timeSinceLast >= 33) {
+		if (timeSinceLast >= RoomSocket.PRESENCE_INTERVAL_MS) {
 			this.sendPresenceImmediate(cursor, selectedIds);
 		} else if (!this.pendingPresenceTimer) {
 			this.pendingPresenceTimer = setTimeout(() => {
 				this.pendingPresenceTimer = null;
 				this.sendPresenceImmediate(this.pendingCursor, this.pendingSelectedIds);
-			}, 33 - timeSinceLast);
+			}, RoomSocket.PRESENCE_INTERVAL_MS - timeSinceLast);
 		}
 	}
 
 	private sendPresenceImmediate(cursor: { x: number; y: number } | null, selectedIds: string[]) {
 		this.lastPresenceTime = Date.now();
+		this.lastSentCursor = cursor ? { x: cursor.x, y: cursor.y } : null;
+		this.lastSentSelectedIds = [...selectedIds];
+
 		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
 
 		const msg: C2SMessage = {
