@@ -198,7 +198,7 @@
 		<!-- Top Left Brand / Return Home -->
 		<a
 			href="/"
-			class="group fixed top-4 left-4 z-20 flex items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1)/90 px-2.5 py-1.5 shadow-lg backdrop-blur-md transition-colors select-none hover:border-(--surface-3) hover:bg-(--surface-2)"
+			class="group fixed top-4 left-4 z-20 flex h-9 items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1)/90 px-3 shadow-lg backdrop-blur-md transition-colors select-none hover:border-(--surface-3) hover:bg-(--surface-2)"
 			title="Back to Mesh Home"
 		>
 			<img
@@ -223,7 +223,7 @@
 		<!-- Reconnecting Notification Banner -->
 		{#if socket.status === 'reconnecting'}
 			<div
-				class="fixed top-4 left-1/2 z-30 flex -translate-x-1/2 items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/15 px-3.5 py-1.5 text-xs text-amber-300 shadow-lg backdrop-blur-md"
+				class="fixed top-4 left-1/2 z-30 flex h-9 -translate-x-1/2 items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/15 px-3.5 text-xs text-amber-300 shadow-lg backdrop-blur-md"
 			>
 				<span class="h-2 w-2 animate-ping rounded-full bg-amber-400"></span>
 				<span>Connection lost. Reconnecting with exponential backoff...</span>
