@@ -80,10 +80,18 @@
 			}
 		};
 
+		const handleVisibilityChange = () => {
+			if (document.visibilityState === 'hidden') {
+				socket?.sendPresence(null, selectedIds);
+			}
+		};
+
 		window.addEventListener('keydown', handleKeyDown);
+		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
+			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			socket?.destroy();
 		};
 	});
