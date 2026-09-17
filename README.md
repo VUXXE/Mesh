@@ -14,7 +14,7 @@
   <a href="#key-features"><img src="https://img.shields.io/badge/Runtime-Cloudflare%20Workers-f38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers" /></a>
   <a href="#architecture--storage"><img src="https://img.shields.io/badge/Storage-Embedded%20SQLite-003b57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite" /></a>
   <a href="#self-hosting-with-docker"><img src="https://img.shields.io/badge/Self--Host-Docker%20Ready-2496ed?style=flat-square&logo=docker&logoColor=white" alt="Docker" /></a>
-  <a href="#getting-started"><img src="https://img.shields.io/badge/Package%20Manager-Bun-fbf0df?style=flat-square&logo=bun&logoColor=black" alt="Bun" /></a>
+  <a href="#-quick-start"><img src="https://img.shields.io/badge/Package%20Manager-Bun-fbf0df?style=flat-square&logo=bun&logoColor=black" alt="Bun" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square" alt="License" /></a>
 </p>
 
@@ -29,6 +29,26 @@
   - _Committed Static Buffer:_ Re-rendered only upon shape mutations or viewport transformations.
   - _60fps Interactive Overlay:_ Renders active drawing previews, selection handles, and live peer cursor movements smoothly without redrawing the entire scene.
 - **Self-Hostable Anywhere:** Deploy to Cloudflare Workers with one command, or self-host in any environment using Docker and Docker Compose. Zero external database dependencies.
+
+---
+
+## 🚀 Quick Start
+
+Run the full-stack whiteboard application (UI + WebSockets + embedded SQLite) locally in under a minute:
+
+```bash
+# 1. Clone the repository
+git clone https://github.com/VUXXE/Mesh.git
+cd Mesh
+
+# 2. Install dependencies
+bun install
+
+# 3. Start the application
+bun start
+```
+
+Open [http://localhost:4173](http://localhost:4173) in your browser. Open an Incognito window to test live multi-user collaboration!
 
 ---
 
@@ -102,6 +122,17 @@ flowchart TD
         DO <-->|30Hz Broadcast| MemStore
     end
 ```
+
+### Modular Architecture
+
+- **Client Canvas Subsystems:**
+  - **`CanvasEngine`** ([`canvas-engine.ts`](src/lib/client/canvas-engine.ts)): Lean coordinator managing viewport transforms, dual-buffer invalidation, state synchronization, and undo/redo history.
+  - **`InteractionController`** ([`canvas-interactions.ts`](src/lib/client/canvas-interactions.ts)): Pointer and multi-touch gestures (pinch-zoom, two-finger pan), shape translation, 8-handle resize transformations, and marquee selection.
+  - **`CanvasRender`** ([`canvas-render.ts`](src/lib/client/canvas-render.ts)): Pure rendering functions for all shape primitives, bounding boxes, resize handles, and 60fps drawing previews.
+  - **`CanvasExport`** ([`canvas-export.ts`](src/lib/client/canvas-export.ts)): High-res PNG rendering, pure vector SVG generation, and JSON room backup/restore.
+  - **`CanvasText`** ([`canvas-text.ts`](src/lib/client/canvas-text.ts)): Typography metrics, bounding box measurement, and multi-line wrapping.
+- **Edge Durable Object Subsystem:**
+  - **`WhiteboardRoom`** ([`room-do.ts`](src/lib/server/room-do.ts)): Single-origin room DO handling WebSocket hibernation, PBKDF2 room authentication, monotonic LWW SQLite transactions, and in-memory presence broadcasting.
 
 ### Monotonic LWW Concurrency
 
@@ -229,6 +260,7 @@ bun run lint
 bun run format
 
 # Run offline unit and regression tests (no server required)
+bun run scripts/test-canvas-modules.ts
 bun run scripts/test-security-fixes.ts
 bun run scripts/test-room-link-parser.ts
 bun run scripts/test-history.ts
@@ -265,8 +297,8 @@ Deploy Mesh to Cloudflare Workers with zero infrastructure management:
 # Authenticate with Cloudflare
 bunx wrangler login
 
-# Deploy directly to your Cloudflare account
-bunx wrangler deploy
+# Build bundle and deploy directly to your Cloudflare account
+bun run deploy
 ```
 
 ---
