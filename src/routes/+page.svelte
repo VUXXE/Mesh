@@ -5,19 +5,21 @@
 
 	const REPO = 'VUXXE/Mesh';
 
+	// Room Creation & Join State
 	let joinRoomId = $state('');
 	let errorMessage = $state('');
 	let roomPassword = $state('');
 	let passwordError = $state('');
 	let starCount = $state<number | null>(null);
 	let isLight = $state(false);
-	let activeTab = $state<'docker' | 'bun' | 'deploy'>('docker');
+	let activeSelfHostTab = $state<'docker' | 'bun' | 'deploy'>('docker');
+	let activeEngineTab = $state<'vector' | 'storage' | 'presence' | 'security'>('vector');
 	let copied = $state(false);
 	let copyTimeout: ReturnType<typeof setTimeout> | null = null;
 
 	// Simulated remote cursor animation state
-	let hananCursor = $state({ x: 185, y: 110 });
-	let mayaCursor = $state({ x: 395, y: 220 });
+	let hananCursor = $state({ x: 190, y: 115 });
+	let mayaCursor = $state({ x: 410, y: 225 });
 
 	function formatStars(n: number): string {
 		if (n >= 1000) {
@@ -71,17 +73,17 @@
 				// Offline or rate-limited
 			});
 
-		// Animate remote cursors softly on preview
+		// Animate simulated remote cursors
 		let angle = 0;
 		const interval = setInterval(() => {
-			angle += 0.04;
+			angle += 0.035;
 			hananCursor = {
-				x: 185 + Math.cos(angle) * 24,
-				y: 110 + Math.sin(angle * 1.5) * 16
+				x: 190 + Math.cos(angle) * 26,
+				y: 115 + Math.sin(angle * 1.4) * 18
 			};
 			mayaCursor = {
-				x: 395 + Math.sin(angle * 0.8) * 20,
-				y: 220 + Math.cos(angle * 1.2) * 14
+				x: 410 + Math.sin(angle * 0.8) * 22,
+				y: 225 + Math.cos(angle * 1.2) * 16
 			};
 		}, 50);
 
@@ -153,7 +155,7 @@
 </script>
 
 <svelte:head>
-	<title>Mesh: Serverless Real-Time Vector Whiteboard</title>
+	<title>Mesh: Open-Source Edge Vector Whiteboard</title>
 	<meta
 		name="description"
 		content="Fast, distraction-free collaborative vector whiteboard on Cloudflare Workers and Svelte 5. Sub-16ms drawing feedback, embedded SQLite, and adaptive ephemeral presence."
@@ -161,43 +163,65 @@
 </svelte:head>
 
 <div
-	class="h-screen w-screen overflow-y-auto bg-(--surface-0) text-(--ink-1) selection:bg-[#6366f1]/30"
+	class="relative h-screen w-screen overflow-x-hidden overflow-y-auto bg-(--surface-0) text-(--ink-1) selection:bg-(--accent-lime)/30"
 >
-	<!-- Navigation Header -->
-	<header
-		class="sticky top-0 z-30 border-b border-(--surface-2) bg-(--surface-0)/80 backdrop-blur-md transition-colors"
+	<!-- SIDE RAILS (OpenDesign signature technical rails) -->
+	<aside
+		class="side-rail left pointer-events-none fixed top-0 bottom-0 left-0 z-30 hidden w-10 items-center justify-center border-r border-(--surface-2)/60 xl:flex"
 	>
-		<div class="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6">
-			<a href="/" class="flex items-center gap-3 focus:outline-none">
-				<div class="h-9 w-9 overflow-hidden rounded-xl border border-(--surface-2) shadow-sm">
-					<img src={logo} alt="Mesh Logo" class="h-full w-full object-cover" />
-				</div>
-				<div class="flex items-center gap-2">
-					<span class="text-base font-bold tracking-tight text-(--ink-1)">Mesh</span>
-					<span
-						class="rounded-md border border-(--surface-2) bg-(--surface-1) px-1.5 py-0.5 font-mono text-[10px] text-(--ink-3)"
-						>v1.0</span
-					>
-				</div>
+		<span class="rail-text text-(--ink-3)">MESH // EDGE VECTOR ENGINE // ISOLATE SQLITE</span>
+	</aside>
+	<aside
+		class="side-rail right pointer-events-none fixed top-0 right-0 bottom-0 z-30 hidden w-10 items-center justify-center border-l border-(--surface-2)/60 xl:flex"
+	>
+		<span class="rail-text text-(--ink-3)">SUB-16MS LATENCY // 15HZ ADAPTIVE // ZERO-IDLE</span>
+	</aside>
+
+	<!-- FLOATING LIQUID-GLASS NAVIGATION BAR -->
+	<header class="sticky top-4 z-50 mx-auto max-w-5xl px-4 sm:px-6">
+		<nav
+			class="flex items-center justify-between gap-4 rounded-full border border-(--surface-2) bg-(--surface-1)/85 px-4 py-2.5 shadow-xl shadow-black/10 backdrop-blur-xl sm:px-6"
+		>
+			<!-- Brand Mark & Identity -->
+			<a href="/" class="text-decoration-none flex items-center gap-2.5">
+				<img src={logo} alt="Mesh Logo" class="h-7 w-7 rounded-lg object-contain shadow-xs" />
+				<span class="font-extrabold tracking-tight text-(--ink-1) sm:text-base">Mesh</span>
+				<span
+					class="hidden items-center gap-1.5 rounded-full border border-(--accent-lime)/30 bg-(--accent-glow) px-2 py-0.5 text-[10px] font-bold text-(--accent-lime) sm:inline-flex"
+				>
+					<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-(--accent-lime)"></span>
+					v1.0 Edge
+				</span>
 			</a>
 
-			<nav class="hidden items-center gap-6 text-xs font-medium text-(--ink-2) md:flex">
-				<a href="#features" class="transition-colors hover:text-(--ink-1)">Features</a>
-				<a href="#architecture" class="transition-colors hover:text-(--ink-1)">Architecture</a>
-				<a href="#self-host" class="transition-colors hover:text-(--ink-1)">Self-Host</a>
-				<a href="#tech-specs" class="transition-colors hover:text-(--ink-1)">Specs</a>
-			</nav>
+			<!-- Nav Links -->
+			<div class="hidden items-center gap-6 text-xs font-semibold tracking-wide md:flex">
+				<a href="#workbench" class="text-(--ink-2) transition-colors hover:text-(--ink-1)">
+					Workbench
+				</a>
+				<a href="#engine" class="text-(--ink-2) transition-colors hover:text-(--ink-1)"> Engine </a>
+				<a href="#architecture" class="text-(--ink-2) transition-colors hover:text-(--ink-1)">
+					Architecture
+				</a>
+				<a href="#self-host" class="text-(--ink-2) transition-colors hover:text-(--ink-1)">
+					Self-Host
+				</a>
+				<a href="#tech-specs" class="text-(--ink-2) transition-colors hover:text-(--ink-1)">
+					Specs
+				</a>
+			</div>
 
-			<div class="flex items-center gap-3">
+			<!-- Right Actions: Theme Toggle, GitHub Stars, Action Pill -->
+			<div class="flex items-center gap-2.5 sm:gap-3">
 				<!-- Theme Toggle -->
 				<button
-					onclick={toggleTheme}
 					type="button"
-					class="flex h-8 w-8 items-center justify-center rounded-lg border border-(--surface-2) bg-(--surface-1) text-(--ink-2) transition-colors hover:border-[#6366f1] hover:text-(--ink-1) focus:ring-2 focus:ring-[#6366f1] focus:outline-none"
-					title={isLight ? 'Switch to dark theme' : 'Switch to light theme'}
-					aria-label="Toggle color theme"
+					onclick={toggleTheme}
+					aria-label="Toggle visual theme"
+					class="flex h-8 w-8 items-center justify-center rounded-full border border-(--surface-2) bg-(--surface-0) text-(--ink-2) transition-colors hover:border-(--surface-3) hover:text-(--ink-1)"
 				>
 					{#if isLight}
+						<!-- Moon Icon -->
 						<svg
 							class="h-4 w-4"
 							viewBox="0 0 24 24"
@@ -208,8 +232,9 @@
 							<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path>
 						</svg>
 					{:else}
+						<!-- Sun Icon -->
 						<svg
-							class="h-4 w-4 text-amber-300"
+							class="h-4 w-4"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
@@ -228,311 +253,371 @@
 					{/if}
 				</button>
 
-				<!-- GitHub Star Pill -->
+				<!-- GitHub Pill -->
 				<a
-					href="https://github.com/VUXXE/Mesh"
+					href="https://github.com/{REPO}"
 					target="_blank"
-					rel="noopener noreferrer"
-					class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 py-1.5 text-xs font-semibold text-(--ink-1) transition-all hover:border-[#6366f1] focus:ring-2 focus:ring-[#6366f1] focus:outline-none"
-					title="Star Mesh on GitHub"
+					rel="noreferrer"
+					class="hidden items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface-0) px-3 py-1 text-xs font-semibold text-(--ink-2) transition-colors hover:border-(--surface-3) hover:text-(--ink-1) sm:inline-flex"
 				>
-					<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+					<svg class="h-3.5 w-3.5 fill-current" viewBox="0 0 24 24">
 						<path
-							d="M12 .5C5.65.5.5 5.65.5 12c0 5.08 3.29 9.39 7.86 10.91.58.11.79-.25.79-.55 0-.27-.01-1.17-.02-2.12-3.2.7-3.88-1.36-3.88-1.36-.52-1.33-1.28-1.68-1.28-1.68-1.04-.71.08-.7.08-.7 1.15.08 1.76 1.18 1.76 1.18 1.03 1.76 2.7 1.25 3.36.96.1-.75.4-1.25.72-1.54-2.55-.29-5.23-1.28-5.23-5.68 0-1.26.45-2.28 1.18-3.09-.12-.29-.51-1.46.11-3.05 0 0 .96-.31 3.15 1.18a10.9 10.9 0 0 1 5.74 0c2.19-1.49 3.15-1.18 3.15-1.18.62 1.59.23 2.76.11 3.05.74.81 1.18 1.83 1.18 3.09 0 4.41-2.69 5.38-5.25 5.67.41.35.77 1.05.77 2.12 0 1.53-.01 2.76-.01 3.14 0 .3.2.67.8.55A11.51 11.51 0 0 0 23.5 12C23.5 5.65 18.35.5 12 .5z"
+							d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"
 						/>
 					</svg>
-					<svg class="h-3.5 w-3.5 text-amber-400" viewBox="0 0 24 24" fill="currentColor">
-						<path
-							d="M12 2l2.94 6.26 6.86.8-5.07 4.7 1.35 6.74L12 17.27 5.92 20.5l1.35-6.74-5.07-4.7 6.86-.8L12 2z"
-						/>
-					</svg>
-					{#if starCount !== null}
-						<span class="tabular-nums">{formatStars(starCount)}</span>
-					{:else}
-						<span>Star</span>
-					{/if}
+					<span>★ {starCount !== null ? formatStars(starCount) : 'Star'}</span>
 				</a>
+
+				<!-- Quick Create CTA Button -->
+				<button
+					type="button"
+					onclick={createRoom}
+					class="inline-flex items-center gap-1.5 rounded-full bg-(--ink-1) px-3.5 py-1.5 text-xs font-bold text-(--surface-0) shadow-xs transition-transform hover:-translate-y-0.5"
+				>
+					<span>New Room</span>
+					<span class="text-(--accent-lime)">→</span>
+				</button>
 			</div>
-		</div>
+		</nav>
 	</header>
 
-	<main class="mx-auto max-w-6xl px-4 sm:px-6">
-		<!-- HERO SECTION -->
-		<section class="pt-12 pb-16 lg:pt-16 lg:pb-24">
-			<!-- Announcement Badge -->
-			<div class="mb-6 flex justify-center lg:justify-start">
-				<div
-					class="inline-flex items-center gap-2 rounded-full border border-(--surface-2) bg-(--surface-1) px-3.5 py-1 text-xs font-medium text-(--ink-2) shadow-xs"
-				>
-					<span class="flex h-2 w-2 rounded-full bg-emerald-400"></span>
-					<span>Zero Accounts Required · Edge-Native SQLite</span>
-				</div>
+	<!-- MAIN CONTENT CONTAINER -->
+	<main class="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+		<!-- HERO SECTION (OpenDesign signature framed title) -->
+		<section class="flex flex-col items-center pt-12 pb-14 text-center sm:pt-16 sm:pb-20">
+			<!-- Top Announcement Pill -->
+			<div
+				class="inline-flex items-center gap-2 rounded-full border border-(--surface-2) bg-(--surface-1) px-4 py-1 text-xs font-semibold text-(--ink-2) shadow-xs"
+			>
+				<span class="h-2 w-2 rounded-full bg-(--accent-lime)"></span>
+				<span>Distraction-free serverless vector canvas</span>
+				<span class="font-mono text-[11px] text-(--ink-3)">// 0ms idle compute</span>
 			</div>
 
-			<!-- Headline & Subheading -->
-			<div class="mb-12 max-w-3xl text-center lg:text-left">
-				<h1
-					class="text-3xl font-extrabold tracking-tight text-(--ink-1) sm:text-5xl sm:leading-tight lg:text-6xl"
-				>
-					Fast, distraction-free whiteboard on the edge.
-				</h1>
-				<p class="mt-4 text-base leading-relaxed text-(--ink-2) sm:text-lg">
-					Built for engineers and designers. Sub-16ms vector input, adaptive ephemeral presence, and
-					embedded SQLite persistence. No sign-ups, no cookies, no tracking. Create a room and start
-					collaborating in seconds.
+			<!-- SIGNATURE FRAMED HERO TITLE (with 4 corner marks) -->
+			<div
+				class="relative mt-8 inline-block max-w-4xl border border-(--accent-lime)/70 bg-(--surface-1)/40 px-6 py-8 backdrop-blur-xs sm:px-14 sm:py-12"
+			>
+				<!-- 4 Corner Tick Squares -->
+				<span class="absolute -top-1.5 -left-1.5 h-3 w-3 bg-(--accent-lime)"></span>
+				<span class="absolute -top-1.5 -right-1.5 h-3 w-3 bg-(--accent-lime)"></span>
+				<span class="absolute -bottom-1.5 -left-1.5 h-3 w-3 bg-(--accent-lime)"></span>
+				<span class="absolute -right-1.5 -bottom-1.5 h-3 w-3 bg-(--accent-lime)"></span>
+
+				<p class="font-mono text-xs font-bold tracking-widest text-(--accent-lime) uppercase">
+					REAL-TIME COLLABORATIVE SYSTEM
 				</p>
+				<h1
+					class="mt-3 text-3xl font-black tracking-tight text-(--ink-1) sm:text-5xl sm:leading-tight lg:text-6xl"
+				>
+					Real-time vector whiteboard,<br />
+					<span class="od-highlight">executed on the edge.</span>
+				</h1>
 			</div>
 
-			<!-- 2-Column Hero Grid: Launcher Card + Live Mockup Canvas -->
-			<div class="grid grid-cols-1 gap-8 lg:grid-cols-12 lg:items-start">
-				<!-- Column 1: Launcher Card (5 cols) -->
-				<div
-					class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xl sm:p-7 lg:col-span-5"
-				>
-					<div class="mb-5">
-						<h2 class="text-base font-bold tracking-tight text-(--ink-1)">Start a Session</h2>
-						<p class="text-xs text-(--ink-2)">Create a clean room or jump into an existing code.</p>
-					</div>
+			<!-- Hero Subheading -->
+			<p class="mt-6 max-w-2xl text-base leading-relaxed text-(--ink-2) sm:text-lg">
+				Built for engineers and product teams. Sub-16ms vector input, adaptive 15Hz presence, and
+				embedded SQLite persistence. No sign-ups, no tracking cookies, and zero idle compute costs.
+			</p>
 
-					<!-- Create Room Action -->
-					<div class="space-y-3.5">
-						<div>
-							<label for="room-password" class="mb-1.5 block text-xs font-medium text-(--ink-2)">
-								Room Password <span class="text-(--ink-3)">(optional)</span>
-							</label>
-							<input
-								id="room-password"
-								type="password"
-								bind:value={roomPassword}
-								placeholder="Set a password to lock this room"
-								autocomplete="new-password"
-								class="w-full rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 text-sm text-(--ink-1) placeholder-(--ink-3) transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
-							/>
-							{#if passwordError}
-								<p class="mt-1 text-xs text-rose-400">{passwordError}</p>
-							{/if}
+			<!-- Hero Action Buttons -->
+			<div class="mt-8 flex flex-wrap items-center justify-center gap-4">
+				<button
+					type="button"
+					onclick={createRoom}
+					class="inline-flex items-center gap-2 rounded-full bg-(--ink-1) px-6 py-3 text-sm font-bold text-(--surface-0) shadow-lg shadow-black/10 transition-transform hover:-translate-y-0.5"
+				>
+					<span>Launch Whiteboard</span>
+					<span class="font-mono font-bold text-(--accent-lime)">→</span>
+				</button>
+				<a
+					href="#workbench"
+					class="inline-flex items-center gap-2 rounded-full border border-(--surface-2) bg-(--surface-1) px-5 py-3 text-sm font-semibold text-(--ink-1) transition-colors hover:border-(--surface-3)"
+				>
+					<span>Explore Workbench</span>
+				</a>
+			</div>
+		</section>
+
+		<!-- WORKBENCH CENTERPIECE (Workstation Window with Room Launcher & Interactive Canvas Preview) -->
+		<section id="workbench" class="mb-16 scroll-mt-24">
+			<div
+				class="overflow-hidden rounded-2xl border border-(--surface-2) bg-(--surface-1) shadow-2xl shadow-black/20"
+			>
+				<!-- Window Header Bar (macOS traffic lights + URL bar) -->
+				<div
+					class="flex items-center justify-between border-b border-(--surface-2) bg-(--surface-0)/80 px-4 py-3"
+				>
+					<div class="flex items-center gap-2">
+						<span class="h-3 w-3 rounded-full bg-[#ef4444]/80"></span>
+						<span class="h-3 w-3 rounded-full bg-[#eab308]/80"></span>
+						<span class="h-3 w-3 rounded-full bg-[#22c55e]/80"></span>
+					</div>
+					<div
+						class="flex items-center gap-2 rounded-md border border-(--surface-2) bg-(--surface-1) px-3 py-1 font-mono text-xs text-(--ink-2)"
+					>
+						<svg
+							class="h-3.5 w-3.5 text-(--accent-lime)"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+							<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+						</svg>
+						<span>https://mesh.workers.dev/room/...</span>
+					</div>
+					<div class="flex items-center gap-2 font-mono text-[11px] text-(--accent-lime)">
+						<span class="h-2 w-2 animate-ping rounded-full bg-(--accent-lime)"></span>
+						<span>LIVE PREVIEW</span>
+					</div>
+				</div>
+
+				<!-- Window Body Grid: Left Launcher + Right Simulated Canvas -->
+				<div class="grid grid-cols-1 lg:grid-cols-12">
+					<!-- LEFT COLUMN: Launcher Station (5 cols) -->
+					<div
+						class="border-b border-(--surface-2) p-6 sm:p-8 lg:col-span-5 lg:border-r lg:border-b-0"
+					>
+						<div class="flex items-center justify-between">
+							<span
+								class="font-mono text-xs font-bold tracking-wider text-(--accent-lime) uppercase"
+							>
+								// ROOM CONTROL
+							</span>
+							<span
+								class="rounded bg-(--surface-2) px-2 py-0.5 text-[10px] font-bold text-(--ink-2)"
+							>
+								PBKDF2 READY
+							</span>
 						</div>
 
-						<button
-							onclick={createRoom}
-							class="flex w-full items-center justify-center gap-2 rounded-xl bg-[#6366f1] px-4 py-3 font-semibold text-white shadow-sm transition-all hover:bg-[#4f46e5] focus:ring-2 focus:ring-[#6366f1] focus:ring-offset-2 focus:ring-offset-(--surface-1) focus:outline-none"
-						>
-							<svg
-								class="h-4 w-4"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2.5"
-							>
-								<line x1="12" y1="5" x2="12" y2="19"></line>
-								<line x1="5" y1="12" x2="19" y2="12"></line>
-							</svg>
-							<span>Create New Whiteboard</span>
-						</button>
+						<h2 class="mt-2 text-xl font-bold text-(--ink-1)">Start or Join Whiteboard</h2>
+						<p class="mt-1 text-xs text-(--ink-2)">
+							Every room is a private, dedicated Durable Object isolate backed by embedded SQLite.
+						</p>
 
-						<div class="my-4 flex items-center gap-3">
+						<!-- Create Room Form -->
+						<div class="mt-6 space-y-4">
+							<div>
+								<label for="create-password" class="block text-xs font-semibold text-(--ink-2)">
+									Room Protection (Optional)
+								</label>
+								<div class="relative mt-1.5">
+									<input
+										id="create-password"
+										type="password"
+										bind:value={roomPassword}
+										placeholder="Leave empty for public, or enter password"
+										class="w-full rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 text-xs text-(--ink-1) placeholder-(--ink-3) transition-colors focus:border-(--accent-lime) focus:outline-none"
+									/>
+									<span class="absolute top-2.5 right-3 text-[10px] text-(--ink-3)">
+										{roomPassword ? 'Locked' : 'Public'}
+									</span>
+								</div>
+								{#if passwordError}
+									<p class="mt-1 text-xs text-red-400">{passwordError}</p>
+								{/if}
+							</div>
+
+							<button
+								type="button"
+								onclick={createRoom}
+								class="flex w-full items-center justify-center gap-2 rounded-xl bg-(--ink-1) px-4 py-3 text-sm font-bold text-(--surface-0) transition-transform hover:-translate-y-0.5"
+							>
+								<span>Create New Whiteboard</span>
+								<span class="font-mono text-(--accent-lime)">→</span>
+							</button>
+						</div>
+
+						<!-- Separator -->
+						<div class="my-6 flex items-center gap-3">
 							<div class="h-px flex-1 bg-(--surface-2)"></div>
-							<span class="text-[11px] font-medium tracking-wider text-(--ink-3) uppercase"
-								>or join existing</span
+							<span class="font-mono text-[10px] text-(--ink-3) uppercase"
+								>OR JOIN BY CODE / LINK</span
 							>
 							<div class="h-px flex-1 bg-(--surface-2)"></div>
 						</div>
 
 						<!-- Join Form -->
-						<form onsubmit={handleJoin} class="space-y-2">
-							<div class="flex items-center gap-2">
+						<form onsubmit={handleJoin} class="space-y-3">
+							<div>
 								<input
 									type="text"
 									bind:value={joinRoomId}
-									placeholder="room-abc123 or paste link"
-									class="flex-1 rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 font-mono text-sm text-(--ink-1) placeholder-(--ink-3) transition-all focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+									placeholder="room-qk5qt3 or full URL"
+									class="w-full rounded-xl border border-(--surface-2) bg-(--surface-0) px-3.5 py-2.5 font-mono text-xs text-(--ink-1) placeholder-(--ink-3) transition-colors focus:border-(--accent-lime) focus:outline-none"
 								/>
-								<button
-									type="submit"
-									class="rounded-xl bg-(--surface-2) px-4 py-2.5 text-sm font-semibold text-(--ink-1) transition-colors hover:bg-(--surface-3) focus:ring-2 focus:ring-[#6366f1] focus:outline-none"
-								>
-									Join
-								</button>
+								{#if errorMessage}
+									<p class="mt-1 text-xs text-red-400">{errorMessage}</p>
+								{/if}
 							</div>
-
-							{#if errorMessage}
-								<p class="mt-1 text-xs text-rose-400">{errorMessage}</p>
-							{/if}
+							<button
+								type="submit"
+								class="flex w-full items-center justify-center gap-2 rounded-xl border border-(--surface-2) bg-(--surface-0) px-4 py-2.5 text-xs font-semibold text-(--ink-1) transition-colors hover:border-(--surface-3)"
+							>
+								<span>Join Whiteboard Session</span>
+							</button>
 						</form>
 
-						<!-- Honest Capabilities -->
-						<div class="mt-5 border-t border-(--surface-2) pt-4">
-							<ul class="space-y-1.5 text-xs text-(--ink-2)">
-								<li class="flex items-center gap-2">
-									<svg
-										class="h-3.5 w-3.5 text-emerald-400"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2.5"
-									>
-										<polyline points="20 6 9 17 4 12" />
-									</svg>
-									<span>Zero sign-up or accounts required</span>
-								</li>
-								<li class="flex items-center gap-2">
-									<svg
-										class="h-3.5 w-3.5 text-emerald-400"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2.5"
-									>
-										<polyline points="20 6 9 17 4 12" />
-									</svg>
-									<span>Password encryption via PBKDF2-SHA256</span>
-								</li>
-								<li class="flex items-center gap-2">
-									<svg
-										class="h-3.5 w-3.5 text-emerald-400"
-										viewBox="0 0 24 24"
-										fill="none"
-										stroke="currentColor"
-										stroke-width="2.5"
-									>
-										<polyline points="20 6 9 17 4 12" />
-									</svg>
-									<span>Self-hostable anywhere with Docker</span>
-								</li>
-							</ul>
-						</div>
-					</div>
-				</div>
-
-				<!-- Column 2: Live Canvas Teaser Preview (7 cols) -->
-				<div
-					class="relative overflow-hidden rounded-2xl border border-(--surface-2) bg-(--surface-1) shadow-xl lg:col-span-7"
-				>
-					<!-- Fake Canvas Titlebar -->
-					<div
-						class="flex h-10 items-center justify-between border-b border-(--surface-2) bg-(--surface-0) px-4"
-					>
-						<div class="flex items-center gap-1.5">
-							<span class="h-2.5 w-2.5 rounded-full bg-rose-500/80"></span>
-							<span class="h-2.5 w-2.5 rounded-full bg-amber-500/80"></span>
-							<span class="h-2.5 w-2.5 rounded-full bg-emerald-500/80"></span>
-							<span class="ml-2 font-mono text-[11px] text-(--ink-3)">room-arch-v1</span>
-						</div>
-						<div class="flex items-center gap-2">
-							<div
-								class="flex items-center gap-1.5 rounded-md bg-(--surface-2) px-2 py-0.5 font-mono text-[10px] text-emerald-400"
-							>
-								<span class="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400"></span>
-								<span>2 peers active</span>
-							</div>
-						</div>
-					</div>
-
-					<!-- Interactive Canvas Preview Body -->
-					<div class="landing-dots relative h-[380px] w-full overflow-hidden p-6 select-none">
-						<!-- Architecture Box 1: Browser Client -->
+						<!-- Feature Bullets -->
 						<div
-							class="absolute top-12 left-8 w-44 rounded-xl border border-[#6366f1] bg-(--surface-1) p-3 shadow-md"
+							class="mt-6 space-y-2 border-t border-(--surface-2) pt-5 text-[11px] text-(--ink-2)"
 						>
 							<div class="flex items-center gap-2">
-								<span class="h-2 w-2 rounded-full bg-[#6366f1]"></span>
+								<span class="text-(--accent-lime)">✓</span>
+								<span>Zero user accounts or telemetry tracking</span>
+							</div>
+							<div class="flex items-center gap-2">
+								<span class="text-(--accent-lime)">✓</span>
+								<span>Single-writer SQLite isolate with monotonic LWW</span>
+							</div>
+							<div class="flex items-center gap-2">
+								<span class="text-(--accent-lime)">✓</span>
+								<span>Adaptive 15Hz presence stream (Free-tier safe)</span>
+							</div>
+						</div>
+					</div>
+
+					<!-- RIGHT COLUMN: Simulated Live Canvas Teaser (7 cols) -->
+					<div
+						class="relative min-h-[380px] bg-(--canvas-bg) p-6 sm:p-8 lg:col-span-7"
+						style="background-image: radial-gradient(circle, var(--grid-dot) 1px, transparent 1px); background-size: 20px 20px;"
+					>
+						<!-- Mini Mock Canvas Toolbar -->
+						<div
+							class="absolute top-4 left-4 z-20 flex items-center gap-1 rounded-full border border-(--surface-2) bg-(--surface-1)/90 px-3 py-1.5 shadow-md backdrop-blur-md"
+						>
+							<span class="rounded bg-(--surface-2) p-1 text-(--accent-lime)">
+								<!-- Select cursor -->
+								<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+									<path d="M4 0l16 12-7 1.5-4 8.5-3-1.5 4-8.5-6-1.5z" />
+								</svg>
+							</span>
+							<span class="p-1 text-(--ink-3)">
+								<!-- Pen -->
+								<svg
+									class="h-3.5 w-3.5"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M12 19l7-7 3 3-7 7-3-3z"></path>
+									<path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
+								</svg>
+							</span>
+							<span class="p-1 text-(--ink-3)">
+								<!-- Rectangle -->
+								<svg
+									class="h-3.5 w-3.5"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<rect x="3" y="3" width="18" height="18" rx="2"></rect>
+								</svg>
+							</span>
+							<span class="p-1 text-(--ink-3)">
+								<!-- Sticky -->
+								<svg
+									class="h-3.5 w-3.5"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+									<polyline points="14 2 14 8 20 8"></polyline>
+								</svg>
+							</span>
+							<span class="ml-1 text-[10px] text-(--ink-3)">|</span>
+							<span class="ml-1 font-mono text-[10px] text-(--ink-2)">100%</span>
+						</div>
+
+						<!-- Status pill top right -->
+						<div
+							class="absolute top-4 right-4 z-20 flex items-center gap-1.5 rounded-full border border-(--surface-2) bg-(--surface-1)/90 px-3 py-1 font-mono text-[10px] text-(--ink-2) shadow-xs backdrop-blur-md"
+						>
+							<span class="h-1.5 w-1.5 rounded-full bg-(--accent-lime)"></span>
+							<span>2 peers active</span>
+						</div>
+
+						<!-- Vector Canvas Elements -->
+						<!-- Architecture Box 1: Browser Client -->
+						<div
+							class="absolute top-16 left-6 w-44 rounded-xl border border-indigo-500/60 bg-(--surface-1) p-3 shadow-md"
+						>
+							<div class="flex items-center gap-1.5">
+								<span class="h-2 w-2 rounded-full bg-indigo-400"></span>
 								<span class="text-xs font-bold text-(--ink-1)">Svelte 5 Client</span>
 							</div>
-							<p class="mt-1 font-mono text-[10px] text-(--ink-3)">Dual-layer 60fps canvas</p>
-							<div class="mt-2 flex items-center gap-1 font-mono text-[9px] text-emerald-400">
-								<span>&lt;1ms local input</span>
+							<p class="mt-1 font-mono text-[10px] text-(--ink-3)">Dual-layer Canvas</p>
+							<div class="mt-2 flex items-center gap-1 font-mono text-[9px] text-indigo-400">
+								<span>RDP smoothing (≤16ms)</span>
 							</div>
 						</div>
 
-						<!-- Connector Line 1: SVG Arrow -->
+						<!-- Connector Line 1: Curved SVG arrow to Durable Object -->
 						<svg
-							class="pointer-events-none absolute top-20 left-52 h-16 w-28 text-(--ink-3)"
-							viewBox="0 0 112 64"
+							class="pointer-events-none absolute top-18 left-48 h-20 w-44 text-(--ink-3)"
+							viewBox="0 0 176 80"
 						>
+							<path
+								d="M 8 20 C 60 0, 110 0, 164 20"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-dasharray="4 4"
+								marker-end="url(#arrowhead)"
+							/>
+							<text x="70" y="34" fill="currentColor" font-size="9" font-family="monospace">
+								wss:// (15Hz)
+							</text>
 							<defs>
 								<marker
 									id="arrowhead"
 									markerWidth="6"
 									markerHeight="6"
-									refX="5"
+									refX="4"
 									refY="3"
 									orient="auto"
 								>
 									<polygon points="0 0, 6 3, 0 6" fill="currentColor" />
 								</marker>
 							</defs>
-							<path
-								d="M 4 20 L 100 20"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-dasharray="4 4"
-								marker-end="url(#arrowhead)"
-							/>
-							<text x="24" y="14" fill="currentColor" font-size="9" font-family="monospace"
-								>WS 101</text
-							>
 						</svg>
 
 						<!-- Architecture Box 2: Cloudflare Durable Object -->
 						<div
-							class="absolute top-12 right-8 w-44 rounded-xl border border-cyan-500/60 bg-(--surface-1) p-3 shadow-md"
+							class="absolute top-16 right-6 w-44 rounded-xl border border-cyan-500/60 bg-(--surface-1) p-3 shadow-md"
 						>
-							<div class="flex items-center gap-2">
+							<div class="flex items-center gap-1.5">
 								<span class="h-2 w-2 rounded-full bg-cyan-400"></span>
 								<span class="text-xs font-bold text-(--ink-1)">Durable Object</span>
 							</div>
 							<p class="mt-1 font-mono text-[10px] text-(--ink-3)">WhiteboardRoom isolate</p>
 							<div class="mt-2 flex items-center gap-1 font-mono text-[9px] text-cyan-400">
-								<span>15Hz adaptive presence</span>
+								<span>Embedded SQLite</span>
 							</div>
 						</div>
 
-						<!-- Connector Line 2: Vertical arrow down to SQLite -->
-						<svg
-							class="pointer-events-none absolute top-36 right-28 h-20 w-16 text-(--ink-3)"
-							viewBox="0 0 64 80"
-						>
-							<path
-								d="M 32 4 L 32 64"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-								stroke-dasharray="4 4"
-								marker-end="url(#arrowhead)"
-							/>
-							<text x="36" y="38" fill="currentColor" font-size="9" font-family="monospace"
-								>LWW</text
-							>
-						</svg>
-
-						<!-- Architecture Box 3: Embedded SQLite -->
+						<!-- Sticky Note: Real system constraint -->
 						<div
-							class="absolute right-8 bottom-8 w-44 rounded-xl border border-emerald-500/60 bg-(--surface-1) p-3 shadow-md"
+							class="absolute bottom-6 left-8 w-52 rotate-[-2deg] rounded-lg border border-amber-300 bg-amber-100 p-3.5 shadow-lg transition-transform hover:rotate-0"
 						>
-							<div class="flex items-center gap-2">
-								<span class="h-2 w-2 rounded-full bg-emerald-400"></span>
-								<span class="text-xs font-bold text-(--ink-1)">Embedded SQLite</span>
-							</div>
-							<p class="mt-1 font-mono text-[10px] text-(--ink-3)">Monotonic conflict-free</p>
-							<div class="mt-2 flex items-center gap-1 font-mono text-[9px] text-emerald-400">
-								<span>Zero idle billing</span>
-							</div>
-						</div>
-
-						<!-- Yellow Sticky Note Mockup -->
-						<div
-							class="absolute bottom-10 left-10 w-48 rotate-[-2deg] rounded-lg border border-amber-300 bg-amber-100 p-3 shadow-lg transition-transform hover:rotate-0"
-						>
-							<div class="mb-1 text-[11px] font-bold text-amber-900">Architecture Decision</div>
+							<div class="mb-1 text-[11px] font-bold text-amber-900">System Decision</div>
 							<p class="text-[11px] leading-snug text-amber-800">
-								Client-side RDP smoothing keeps edge isolates fast (≤2ms). Presence stays in-memory.
+								Presence stays ephemeral in DO memory; shapes persist to SQLite with monotonic LWW.
 							</p>
 						</div>
 
-						<!-- Animated Remote Cursor 1: Hanan (Cyan) -->
+						<!-- Simulated Collaborator Cursor 1: Hanan (Cyan) -->
 						<div
-							class="pointer-events-none absolute z-10 transition-all duration-75"
+							class="pointer-events-none absolute z-20 transition-all duration-75"
 							style="transform: translate({hananCursor.x}px, {hananCursor.y}px);"
 						>
 							<svg
@@ -549,9 +634,9 @@
 							</span>
 						</div>
 
-						<!-- Animated Remote Cursor 2: Maya (Amber) -->
+						<!-- Simulated Collaborator Cursor 2: Maya (Amber) -->
 						<div
-							class="pointer-events-none absolute z-10 transition-all duration-75"
+							class="pointer-events-none absolute z-20 transition-all duration-75"
 							style="transform: translate({mayaCursor.x}px, {mayaCursor.y}px);"
 						>
 							<svg
@@ -562,7 +647,7 @@
 								<path d="M4 0l16 12-7 1.5-4 8.5-3-1.5 4-8.5-6-1.5z" />
 							</svg>
 							<span
-								class="ml-3 rounded-md bg-amber-400 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-xs"
+								class="ml-3 rounded-md bg-amber-500 px-1.5 py-0.5 text-[10px] font-semibold text-black shadow-xs"
 							>
 								Maya
 							</span>
@@ -572,332 +657,426 @@
 			</div>
 		</section>
 
-		<!-- STATS / METRIC BAR -->
-		<section class="border-y border-(--surface-2) py-8">
-			<div class="grid grid-cols-2 gap-6 md:grid-cols-4">
-				<div class="text-center sm:text-left">
-					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">&lt; 16ms</p>
-					<p class="mt-1 text-xs text-(--ink-2)">Input-to-render loop</p>
+		<!-- TELEMETRY WIRE TICKER (OpenDesign continuous stream) -->
+		<section class="mb-20 overflow-hidden border-y border-(--surface-2) py-3.5">
+			<div class="animate-ticker flex items-center gap-8 font-mono text-xs text-(--ink-2)">
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-(--accent-lime)"></span>
+					<span class="text-(--ink-1)">LATENCY: &lt; 16MS</span>
 				</div>
-				<div class="text-center sm:text-left">
-					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">15 Hz</p>
-					<p class="mt-1 text-xs text-(--ink-2)">Adaptive presence stream</p>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
+					<span class="text-(--ink-1)">PRESENCE: 15HZ ADAPTIVE</span>
 				</div>
-				<div class="text-center sm:text-left">
-					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">50 Peers</p>
-					<p class="mt-1 text-xs text-(--ink-2)">Max concurrent capacity</p>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+					<span class="text-(--ink-1)">PERSISTENCE: MONOTONIC LWW SQLITE</span>
 				</div>
-				<div class="text-center sm:text-left">
-					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">Zero Idle</p>
-					<p class="mt-1 text-xs text-(--ink-2)">WebSocket hibernation API</p>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-purple-400"></span>
+					<span class="text-(--ink-1)">COMPUTE: ZERO-IDLE HIBERNATION</span>
+				</div>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-amber-400"></span>
+					<span class="text-(--ink-1)">CAPACITY: 50 PEERS / 10,000 SHAPES</span>
+				</div>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-rose-400"></span>
+					<span class="text-(--ink-1)">SECURITY: PBKDF2-SHA256</span>
+				</div>
+				<span>//</span>
+				<!-- Duplicate loop for continuous marquee -->
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-(--accent-lime)"></span>
+					<span class="text-(--ink-1)">LATENCY: &lt; 16MS</span>
+				</div>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-cyan-400"></span>
+					<span class="text-(--ink-1)">PRESENCE: 15HZ ADAPTIVE</span>
+				</div>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-emerald-400"></span>
+					<span class="text-(--ink-1)">PERSISTENCE: MONOTONIC LWW SQLITE</span>
+				</div>
+				<span>//</span>
+				<div class="flex items-center gap-2">
+					<span class="h-1.5 w-1.5 rounded-full bg-purple-400"></span>
+					<span class="text-(--ink-1)">COMPUTE: ZERO-IDLE HIBERNATION</span>
 				</div>
 			</div>
 		</section>
 
-		<!-- BENTO GRID: FEATURES -->
-		<section id="features" class="py-16 sm:py-24">
-			<div class="mb-12 max-w-2xl">
-				<h2 class="text-2xl font-extrabold tracking-tight text-(--ink-1) sm:text-3xl">
+		<!-- INTERACTIVE ENGINE DOCK (OpenDesign Labs Dock Style) -->
+		<section id="engine" class="mb-24 scroll-mt-24">
+			<div class="mb-8">
+				<div class="inline-flex items-center gap-2">
+					<span class="h-px w-5 bg-(--accent-lime)"></span>
+					<span class="font-mono text-xs font-bold tracking-widest text-(--accent-lime) uppercase">
+						CORE SYSTEMS
+					</span>
+				</div>
+				<h2 class="mt-2 text-2xl font-black tracking-tight text-(--ink-1) sm:text-3xl">
 					Engineered for speed, built without bloat.
 				</h2>
-				<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
-					Mesh strips away complex cloud dependencies and account gates, delivering a pure vector
-					whiteboard that responds instantly.
+				<p class="mt-2 text-sm text-(--ink-2)">
+					Select a subsystem below to inspect its architecture guarantees and design decisions.
 				</p>
 			</div>
 
-			<div class="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
-				<!-- Feature 1: Vector Drawing -->
-				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xs">
-					<div
-						class="flex h-10 w-10 items-center justify-center rounded-xl bg-[#6366f1]/10 text-[#6366f1]"
-					>
-						<svg
-							class="h-5 w-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
+			<!-- Interactive Subsystem Tabs -->
+			<div class="flex flex-wrap items-center gap-2 border-b border-(--surface-2) pb-4">
+				<button
+					type="button"
+					onclick={() => (activeEngineTab = 'vector')}
+					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all {activeEngineTab ===
+					'vector'
+						? 'bg-(--accent-lime) text-black shadow-md'
+						: 'bg-(--surface-1) text-(--ink-2) hover:text-(--ink-1)'}"
+				>
+					<span>✏️ Vector Engine</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => (activeEngineTab = 'storage')}
+					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all {activeEngineTab ===
+					'storage'
+						? 'bg-(--accent-lime) text-black shadow-md'
+						: 'bg-(--surface-1) text-(--ink-2) hover:text-(--ink-1)'}"
+				>
+					<span>🗄️ Durable SQLite</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => (activeEngineTab = 'presence')}
+					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all {activeEngineTab ===
+					'presence'
+						? 'bg-(--accent-lime) text-black shadow-md'
+						: 'bg-(--surface-1) text-(--ink-2) hover:text-(--ink-1)'}"
+				>
+					<span>⚡ Adaptive Presence</span>
+				</button>
+				<button
+					type="button"
+					onclick={() => (activeEngineTab = 'security')}
+					class="flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all {activeEngineTab ===
+					'security'
+						? 'bg-(--accent-lime) text-black shadow-md'
+						: 'bg-(--surface-1) text-(--ink-2) hover:text-(--ink-1)'}"
+				>
+					<span>🔒 Zero-Knowledge Auth</span>
+				</button>
+			</div>
+
+			<!-- Active Subsystem Card Display -->
+			<div class="mt-6 rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 sm:p-8">
+				{#if activeEngineTab === 'vector'}
+					<div class="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
+						<div>
+							<span class="font-mono text-xs font-bold text-(--accent-lime)"
+								>// DUAL-LAYER CANVAS</span
+							>
+							<h3 class="mt-2 text-xl font-black text-(--ink-1)">Sub-16ms Vector Render Loop</h3>
+							<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
+								Mesh splits rendering across two decoupled canvas surfaces. The committed buffer
+								redraws strictly on shape additions or removals. Active drawing previews, live drag
+								bounding boxes, and remote peer cursors execute on an overlay running at a locked
+								60fps.
+							</p>
+							<div class="mt-5 grid grid-cols-2 gap-4 font-mono text-xs">
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Smoothing Algorithm</p>
+									<p class="mt-1 font-bold text-(--ink-1)">Ramer-Douglas-Peucker</p>
+								</div>
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Supported Primitives</p>
+									<p class="mt-1 font-bold text-(--ink-1)">7 Vector Tools</p>
+								</div>
+							</div>
+						</div>
+						<div
+							class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5 font-mono text-xs text-(--ink-2)"
 						>
-							<path d="M12 19l7-7 3 3-7 7-3-3z"></path>
-							<path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"></path>
-							<path d="M2 2l7.586 7.586"></path>
-							<circle cx="11" cy="11" r="2"></circle>
-						</svg>
+							<div class="text-(--accent-lime)">// Client-Side Geometry Optimization</div>
+							<p class="mt-2 text-(--ink-1)">
+								const points = ramerDouglasPeucker(rawStroke, 1.2);<br />
+								const shape = {'{'} id, type: 'path', data: {'{'} points {'}'}
+								{'}'};
+							</p>
+							<p class="mt-4 text-(--ink-3)">
+								/* Geometry computation happens purely in the client worker thread, ensuring DO
+								handlers stay &le; 2ms */
+							</p>
+						</div>
 					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Sub-16ms Vector Engine</h3>
+				{:else if activeEngineTab === 'storage'}
+					<div class="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
+						<div>
+							<span class="font-mono text-xs font-bold text-emerald-400"
+								>// ISOLATE TRANSACTION STORAGE</span
+							>
+							<h3 class="mt-2 text-xl font-black text-(--ink-1)">Deterministic Monotonic LWW</h3>
+							<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
+								Each whiteboard room operates as an independent Cloudflare Durable Object isolate
+								with its own embedded SQLite database. Multi-user concurrent writes resolve via
+								Last-Write-Wins with clock-skew safeguards, preventing conflicting mutations without
+								centralized database bottlenecks.
+							</p>
+							<div class="mt-5 grid grid-cols-2 gap-4 font-mono text-xs">
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Storage Medium</p>
+									<p class="mt-1 font-bold text-(--ink-1)">Embedded SQLite</p>
+								</div>
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Clock-Skew Cap</p>
+									<p class="mt-1 font-bold text-(--ink-1)">+5000ms Clamping</p>
+								</div>
+							</div>
+						</div>
+						<div
+							class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5 font-mono text-xs text-(--ink-2)"
+						>
+							<div class="text-emerald-400">-- Embedded Transactional Upsert</div>
+							<p class="mt-2 text-(--ink-1)">
+								INSERT INTO shapes (id, type, x, y, updated_at)<br />
+								VALUES (?, ?, ?, ?, ?)<br />
+								ON CONFLICT(id) DO UPDATE SET<br />
+								&nbsp;&nbsp;x = excluded.x, updated_at = excluded.updated_at<br />
+								WHERE excluded.updated_at &gt;= shapes.updated_at;
+							</p>
+						</div>
+					</div>
+				{:else if activeEngineTab === 'presence'}
+					<div class="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
+						<div>
+							<span class="font-mono text-xs font-bold text-cyan-400">// WEBSOCKET HIBERNATION</span
+							>
+							<h3 class="mt-2 text-xl font-black text-(--ink-1)">Adaptive 15Hz Presence</h3>
+							<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
+								Cursor tracking is broadcast in memory and never touches disk. While alone in a
+								room, cursor transmissions are completely suppressed, saving over 100,000
+								invocations per hour and preserving Cloudflare Free Tier quotas. When collaborating,
+								transmissions adaptively stream at 15Hz with deadband filtering.
+							</p>
+							<div class="mt-5 grid grid-cols-2 gap-4 font-mono text-xs">
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Solo Quota Usage</p>
+									<p class="mt-1 font-bold text-(--ink-1)">0 Cursor Requests</p>
+								</div>
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Deadband Filter</p>
+									<p class="mt-1 font-bold text-(--ink-1)">&lt; 2px Movement</p>
+								</div>
+							</div>
+						</div>
+						<div
+							class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5 font-mono text-xs text-(--ink-2)"
+						>
+							<div class="text-cyan-400">// In-Memory Presence Attachment</div>
+							<p class="mt-2 text-(--ink-1)">
+								if (this.peers.length === 0 &amp;&amp; cursor !== null) return;<br />
+								if (distSq &lt; 4 &amp;&amp; selectionUnchanged) return;<br />
+								ws.serializeAttachment({'{'} userId, name, color, cursor {'}'});
+							</p>
+							<p class="mt-4 text-(--ink-3)">
+								/* Ephemeral packets bypass disk writes, eliminating lock contention */
+							</p>
+						</div>
+					</div>
+				{:else if activeEngineTab === 'security'}
+					<div class="grid grid-cols-1 gap-8 md:grid-cols-2 md:items-center">
+						<div>
+							<span class="font-mono text-xs font-bold text-purple-400"
+								>// CRYPTOGRAPHIC VERIFICATION</span
+							>
+							<h3 class="mt-2 text-xl font-black text-(--ink-1)">Zero-Knowledge Room Locks</h3>
+							<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
+								Password-protected rooms enforce client-side derivation with PBKDF2-SHA256 (100,000
+								iterations). Unauthenticated sockets are strictly withheld from receiving shapes,
+								presence streams, or mutation events until authenticated. Brute-force throttling and
+								connection timeouts prevent automated attacks.
+							</p>
+							<div class="mt-5 grid grid-cols-2 gap-4 font-mono text-xs">
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Derivation Iterations</p>
+									<p class="mt-1 font-bold text-(--ink-1)">100,000 Rounds</p>
+								</div>
+								<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-3">
+									<p class="text-(--ink-3)">Auth Gate Policy</p>
+									<p class="mt-1 font-bold text-(--ink-1)">Strict Isolation</p>
+								</div>
+							</div>
+						</div>
+						<div
+							class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5 font-mono text-xs text-(--ink-2)"
+						>
+							<div class="text-purple-400">// Constant-Time Hash Matching</div>
+							<p class="mt-2 text-(--ink-1)">
+								const actual = await this.hashPassword(input, salt);<br />
+								return this.hashesEqual(actual, expectedHash);
+							</p>
+							<p class="mt-4 text-(--ink-3)">
+								/* Rate limits: 5-second lockout after 5 fails; disconnect code 1008 after 10
+								attempts */
+							</p>
+						</div>
+					</div>
+				{/if}
+			</div>
+		</section>
+
+		<!-- 3-TIER ARCHITECTURE VISUALIZER -->
+		<section id="architecture" class="mb-24 scroll-mt-24">
+			<div class="mb-10 text-center sm:text-left">
+				<div class="inline-flex items-center gap-2">
+					<span class="h-px w-5 bg-(--accent-lime)"></span>
+					<span class="font-mono text-xs font-bold tracking-widest text-(--accent-lime) uppercase">
+						SYSTEM TOPOLOGY
+					</span>
+				</div>
+				<h2 class="mt-2 text-2xl font-black tracking-tight text-(--ink-1) sm:text-3xl">
+					Single origin. Zero external database dependencies.
+				</h2>
+			</div>
+
+			<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
+				<!-- Tier 1: Client Layer -->
+				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6">
+					<div
+						class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-500/10 text-indigo-400"
+					>
+						<span class="font-mono text-xs font-bold">01</span>
+					</div>
+					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Browser Client</h3>
 					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Freehand pen drawing with client-side Ramer-Douglas-Peucker (RDP) trajectory smoothing.
-						Dual-layer canvas isolates committed strokes from the 60fps interaction overlay.
+						Runs Svelte 5 with fine-grained reactivity ($state/$effect). Captures pointer events,
+						smooths strokes with RDP, and renders optimistic updates locally.
 					</p>
 				</div>
 
-				<!-- Feature 2: Ephemeral Presence -->
-				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xs">
+				<!-- Tier 2: Edge Router -->
+				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6">
 					<div
 						class="flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-500/10 text-cyan-400"
 					>
-						<svg
-							class="h-5 w-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-							<circle cx="9" cy="7" r="4"></circle>
-							<path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-							<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-						</svg>
+						<span class="font-mono text-xs font-bold">02</span>
 					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Adaptive Ephemeral Presence</h3>
+					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Anycast Edge Worker</h3>
 					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Live remote cursors and shape selections stream at an adaptive 15Hz with deadband
-						filtering and solo-room silence. Keeps free-tier usage minimal with zero SQLite disk
-						writes.
+						hooks.server.ts intercepts /api/room/:id/ws before page resolution, routing the raw
+						upgrade to the dedicated room isolate via idFromName(roomId).
 					</p>
 				</div>
 
-				<!-- Feature 3: Embedded SQLite -->
-				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xs">
+				<!-- Tier 3: Room Isolate & SQLite -->
+				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6">
 					<div
 						class="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-400"
 					>
-						<svg
-							class="h-5 w-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<ellipse cx="12" cy="5" rx="9" ry="3"></ellipse>
-							<path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path>
-							<path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path>
-						</svg>
+						<span class="font-mono text-xs font-bold">03</span>
 					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Monotonic LWW Storage</h3>
+					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Durable Object & SQLite</h3>
 					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Each whiteboard room is an isolated Durable Object with embedded SQLite. Updates
-						reconcile via monotonic Last-Write-Wins timestamps with clock-skew clamping.
-					</p>
-				</div>
-
-				<!-- Feature 4: Room Security -->
-				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xs">
-					<div
-						class="flex h-10 w-10 items-center justify-center rounded-xl bg-rose-500/10 text-rose-400"
-					>
-						<svg
-							class="h-5 w-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-							<path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
-						</svg>
-					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">PBKDF2 Password Gates</h3>
-					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Protect rooms with salted PBKDF2-SHA256 passwords (100,000 iterations). Unauthenticated
-						sockets are isolated from canvas shapes and presence data.
-					</p>
-				</div>
-
-				<!-- Feature 5: Touch Gestures -->
-				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xs">
-					<div
-						class="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 text-amber-400"
-					>
-						<svg
-							class="h-5 w-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect>
-							<line x1="12" y1="18" x2="12.01" y2="18"></line>
-						</svg>
-					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Touch, Pinch & MiniMap</h3>
-					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Native two-finger pinch-to-zoom and two-finger panning on mobile and trackpads.
-						Real-time radar MiniMap lets you jump across large infinite diagrams.
-					</p>
-				</div>
-
-				<!-- Feature 6: Backup & Export -->
-				<div class="rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 shadow-xs">
-					<div
-						class="flex h-10 w-10 items-center justify-center rounded-xl bg-violet-500/10 text-violet-400"
-					>
-						<svg
-							class="h-5 w-5"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-						>
-							<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-							<polyline points="7 10 12 15 17 10"></polyline>
-							<line x1="12" y1="15" x2="12" y2="3"></line>
-						</svg>
-					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Vector Export & Backups</h3>
-					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Export diagrams to high-resolution PNG, clean vector SVG for Figma or Illustrator, or
-						portable JSON with one-click restoration.
+						One isolate per room. Accepts hibernating WebSocket connections, resolves LWW conflicts,
+						and commits to single-tenant transactional SQLite storage.
 					</p>
 				</div>
 			</div>
 		</section>
 
-		<!-- ARCHITECTURE DIAGRAM SECTION -->
-		<section id="architecture" class="border-t border-(--surface-2) py-16 sm:py-24">
-			<div class="mb-12 max-w-2xl">
-				<h2 class="text-2xl font-extrabold tracking-tight text-(--ink-1) sm:text-3xl">
-					Single-origin edge architecture.
+		<!-- SELF-HOSTING TERMINAL STATION -->
+		<section id="self-host" class="mb-24 scroll-mt-24">
+			<div class="mb-8">
+				<div class="inline-flex items-center gap-2">
+					<span class="h-px w-5 bg-(--accent-lime)"></span>
+					<span class="font-mono text-xs font-bold tracking-widest text-(--accent-lime) uppercase">
+						DEPLOYMENT
+					</span>
+				</div>
+				<h2 class="mt-2 text-2xl font-black tracking-tight text-(--ink-1) sm:text-3xl">
+					Self-host in your own cloud or container.
 				</h2>
-				<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
-					SSR pages, WebSocket endpoints, and Durable Objects live in the same Cloudflare Worker
-					origin. No reverse proxies, no CORS configuration, no database connection pools.
-				</p>
 			</div>
 
 			<div
-				class="overflow-hidden rounded-2xl border border-(--surface-2) bg-(--surface-1) p-6 sm:p-8"
+				class="overflow-hidden rounded-2xl border border-(--surface-2) bg-(--surface-1) shadow-xl"
 			>
-				<div class="grid grid-cols-1 gap-6 md:grid-cols-3">
-					<!-- Step 1 -->
-					<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5">
-						<div class="font-mono text-xs font-semibold text-[#6366f1]">01 / CLIENT TIER</div>
-						<h3 class="mt-2 text-sm font-bold text-(--ink-1)">Dual-Layer Canvas</h3>
-						<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-							Mutations render locally within &lt;1ms. Pen strokes are smoothed with RDP on the
-							device, never loading server CPU with geometry math.
-						</p>
-					</div>
-
-					<!-- Step 2 -->
-					<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5">
-						<div class="font-mono text-xs font-semibold text-cyan-400">02 / EDGE ROUTER</div>
-						<h3 class="mt-2 text-sm font-bold text-(--ink-1)">WebSocket Upgrade</h3>
-						<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-							hooks.server.ts intercepts /api/room/:id/ws before SvelteKit page resolution, routing
-							directly to the room's Durable Object stub.
-						</p>
-					</div>
-
-					<!-- Step 3 -->
-					<div class="rounded-xl border border-(--surface-2) bg-(--surface-0) p-5">
-						<div class="font-mono text-xs font-semibold text-emerald-400">03 / ISOLATE & DB</div>
-						<h3 class="mt-2 text-sm font-bold text-(--ink-1)">Embedded SQLite</h3>
-						<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-							Shapes commit transactionally via monotonic LWW upserts in ≤2ms. Sockets hibernate
-							automatically, consuming zero compute between events.
-						</p>
-					</div>
-				</div>
-			</div>
-		</section>
-
-		<!-- QUICK SELF-HOST (DOCKER / BUN) -->
-		<section id="self-host" class="border-t border-(--surface-2) py-16 sm:py-24">
-			<div class="mb-8 max-w-2xl">
-				<h2 class="text-2xl font-extrabold tracking-tight text-(--ink-1) sm:text-3xl">
-					Self-host anywhere with zero external databases.
-				</h2>
-				<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
-					Mesh is 100% self-contained. Run it on your VPS, Raspberry Pi, home lab, or deploy to
-					Cloudflare Free Tier.
-				</p>
-			</div>
-
-			<div class="overflow-hidden rounded-2xl border border-(--surface-2) bg-(--surface-1)">
-				<!-- Tabs -->
+				<!-- Terminal Tab Bar -->
 				<div
-					class="flex items-center justify-between border-b border-(--surface-2) bg-(--surface-0) px-4"
+					class="flex flex-wrap items-center justify-between gap-4 border-b border-(--surface-2) bg-(--surface-0)/80 px-4 py-3"
 				>
-					<div class="flex items-center gap-1">
+					<div class="flex items-center gap-2">
 						<button
-							onclick={() => (activeTab = 'docker')}
-							class="border-b-2 px-3 py-3 text-xs font-semibold transition-colors {activeTab ===
+							type="button"
+							onclick={() => (activeSelfHostTab = 'docker')}
+							class="rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors {activeSelfHostTab ===
 							'docker'
-								? 'border-[#6366f1] text-(--ink-1)'
-								: 'border-transparent text-(--ink-3) hover:text-(--ink-2)'}"
+								? 'bg-(--surface-2) text-(--ink-1)'
+								: 'text-(--ink-3) hover:text-(--ink-1)'}"
 						>
 							Docker Compose
 						</button>
 						<button
-							onclick={() => (activeTab = 'bun')}
-							class="border-b-2 px-3 py-3 text-xs font-semibold transition-colors {activeTab ===
+							type="button"
+							onclick={() => (activeSelfHostTab = 'bun')}
+							class="rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors {activeSelfHostTab ===
 							'bun'
-								? 'border-[#6366f1] text-(--ink-1)'
-								: 'border-transparent text-(--ink-3) hover:text-(--ink-2)'}"
+								? 'bg-(--surface-2) text-(--ink-1)'
+								: 'text-(--ink-3) hover:text-(--ink-1)'}"
 						>
-							Bun (Edge Runtime)
+							Bun Runtime
 						</button>
 						<button
-							onclick={() => (activeTab = 'deploy')}
-							class="border-b-2 px-3 py-3 text-xs font-semibold transition-colors {activeTab ===
+							type="button"
+							onclick={() => (activeSelfHostTab = 'deploy')}
+							class="rounded-lg px-3 py-1.5 font-mono text-xs font-semibold transition-colors {activeSelfHostTab ===
 							'deploy'
-								? 'border-[#6366f1] text-(--ink-1)'
-								: 'border-transparent text-(--ink-3) hover:text-(--ink-2)'}"
+								? 'bg-(--surface-2) text-(--ink-1)'
+								: 'text-(--ink-3) hover:text-(--ink-1)'}"
 						>
 							Cloudflare Deploy
 						</button>
 					</div>
 
 					<button
-						onclick={() => copyCode(snippets[activeTab])}
-						class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 py-1 text-xs font-medium text-(--ink-2) transition-colors hover:text-(--ink-1) focus:outline-none"
+						type="button"
+						onclick={() => copyCode(snippets[activeSelfHostTab])}
+						class="flex items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 py-1 text-xs font-semibold text-(--ink-2) transition-colors hover:border-(--surface-3) hover:text-(--ink-1)"
 					>
 						{#if copied}
-							<svg
-								class="h-3.5 w-3.5 text-emerald-400"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2.5"
-							>
-								<polyline points="20 6 9 17 4 12" />
-							</svg>
-							<span class="text-emerald-400">Copied</span>
+							<span class="text-(--accent-lime)">✓ Copied!</span>
 						{:else}
-							<svg
-								class="h-3.5 w-3.5"
-								viewBox="0 0 24 24"
-								fill="none"
-								stroke="currentColor"
-								stroke-width="2"
-							>
-								<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-								<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-							</svg>
-							<span>Copy</span>
+							<span>Copy Command</span>
 						{/if}
 					</button>
 				</div>
 
-				<!-- Code Box -->
-				<div class="p-5 font-mono text-xs leading-relaxed text-(--ink-1)">
-					<pre class="overflow-x-auto"><code>{snippets[activeTab]}</code></pre>
+				<!-- Terminal Code View -->
+				<div class="p-6 font-mono text-xs leading-relaxed sm:text-sm">
+					<pre class="overflow-x-auto text-(--ink-1)"><code>{snippets[activeSelfHostTab]}</code
+						></pre>
 				</div>
 			</div>
 		</section>
 
-		<!-- TECH SPECS & GUARDRAILS -->
-		<section id="tech-specs" class="border-t border-(--surface-2) py-16 sm:py-24">
-			<div class="mb-10 max-w-2xl">
-				<h2 class="text-2xl font-extrabold tracking-tight text-(--ink-1) sm:text-3xl">
-					Technical Limits & Guardrails
+		<!-- PROTOCOL SPECS & TECHNICAL LIMITS TABLE -->
+		<section id="tech-specs" class="mb-24 scroll-mt-24">
+			<div class="mb-8">
+				<div class="inline-flex items-center gap-2">
+					<span class="h-px w-5 bg-(--accent-lime)"></span>
+					<span class="font-mono text-xs font-bold tracking-widest text-(--accent-lime) uppercase">
+						SPECIFICATION
+					</span>
+				</div>
+				<h2 class="mt-2 text-2xl font-black tracking-tight text-(--ink-1) sm:text-3xl">
+					Hard protocol bounds &amp; invariants.
 				</h2>
-				<p class="mt-3 text-sm leading-relaxed text-(--ink-2)">
-					Mesh enforces strict room isolation and rate limits to guarantee sub-16ms latency even on
-					free tier resources.
-				</p>
 			</div>
 
 			<div class="overflow-hidden rounded-2xl border border-(--surface-2) bg-(--surface-1)">
@@ -941,52 +1120,43 @@
 		</section>
 	</main>
 
-	<!-- FOOTER -->
-	<footer class="border-t border-(--surface-2) bg-(--surface-0) py-10 transition-colors">
+	<!-- EDITORIAL TYPOGRAPHIC FOOTER -->
+	<footer class="border-t border-(--surface-2) bg-(--surface-0) py-12 transition-colors">
 		<div
-			class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6"
+			class="mx-auto flex max-w-6xl flex-col items-center justify-between gap-6 px-4 sm:flex-row sm:px-6 lg:px-8"
 		>
 			<div class="flex items-center gap-3">
-				<img src="/made-by-white.svg" alt="Made by" class="madeby-dark h-5 w-auto" />
-				<img src="/made-by-black.svg" alt="Made by" class="madeby-light h-5 w-auto" />
-				<span class="text-xs text-(--ink-3)">Distributed real-time vector whiteboard.</span>
+				<img src={logo} alt="Mesh Logo" class="h-6 w-6 rounded-md object-contain" />
+				<span class="text-sm font-bold text-(--ink-1)">Mesh</span>
+				<span class="text-xs text-(--ink-3)">// MIT Open Source License</span>
 			</div>
 
-			<div class="flex items-center gap-5 text-xs text-(--ink-3)">
+			<div class="flex items-center gap-6 text-xs text-(--ink-2)">
 				<a
-					href="https://github.com/VUXXE/Mesh"
+					href="https://github.com/{REPO}"
 					target="_blank"
-					rel="noopener noreferrer"
+					rel="noreferrer"
 					class="transition-colors hover:text-(--ink-1)"
 				>
-					GitHub
+					GitHub Repository
 				</a>
 				<a
-					href="https://github.com/VUXXE/Mesh/blob/main/LICENSE"
+					href="https://github.com/{REPO}/blob/main/LICENSE"
 					target="_blank"
-					rel="noopener noreferrer"
+					rel="noreferrer"
 					class="transition-colors hover:text-(--ink-1)"
 				>
-					MIT License
+					License
 				</a>
-				<a href="#features" class="transition-colors hover:text-(--ink-1)">Back to top ↑</a>
+				<a
+					href="https://github.com/{REPO}/releases"
+					target="_blank"
+					rel="noreferrer"
+					class="transition-colors hover:text-(--ink-1)"
+				>
+					Releases
+				</a>
 			</div>
 		</div>
 	</footer>
 </div>
-
-<style>
-	.landing-dots {
-		background-image: radial-gradient(circle, var(--grid-dot) 1.2px, transparent 1.2px);
-		background-size: 24px 24px;
-	}
-	.madeby-light {
-		display: none;
-	}
-	:global(html.light) .madeby-light {
-		display: block;
-	}
-	:global(html.light) .madeby-dark {
-		display: none;
-	}
-</style>
