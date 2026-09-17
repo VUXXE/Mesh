@@ -21,6 +21,23 @@
 	let passwordClaimed = false;
 	const history = new HistoryManager();
 
+	let copiedCode = $state(false);
+	let copiedLink = $state(false);
+
+	function copyRoomCode() {
+		if (typeof window === 'undefined') return;
+		navigator.clipboard.writeText(roomId);
+		copiedCode = true;
+		setTimeout(() => (copiedCode = false), 2000);
+	}
+
+	function copyRoomLink() {
+		if (typeof window === 'undefined') return;
+		navigator.clipboard.writeText(window.location.href);
+		copiedLink = true;
+		setTimeout(() => (copiedLink = false), 2000);
+	}
+
 	onMount(() => {
 		if (!isValidRoomId) return;
 
@@ -203,27 +220,105 @@
 	</div>
 {:else if socket}
 	<div class="relative h-screen w-screen overflow-hidden bg-(--surface-0)">
-		<!-- Top Left Brand / Return Home -->
-		<a
-			href="/"
-			class="group fixed top-4 left-4 z-20 flex h-9 items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1)/90 px-3 shadow-lg backdrop-blur-md transition-colors select-none hover:border-(--surface-3) hover:bg-(--surface-2)"
-			title="Back to Mesh Home"
+		<!-- Top Left Bar: Brand, Room Code & Share Action -->
+		<div
+			class="fixed top-4 left-4 z-20 flex h-9 items-center rounded-lg border border-(--surface-2) bg-(--surface-1)/90 px-2 shadow-sm backdrop-blur-md transition-colors select-none sm:px-2.5"
 		>
-			<img
-				src={logo}
-				alt="Mesh Logo"
-				class="h-5 w-5 rounded-md object-cover shadow-sm transition-transform group-hover:scale-105"
-			/>
-			<span class="text-xs font-semibold tracking-tight text-(--ink-1)">Mesh</span>
-		</a>
+			<!-- Home / Brand -->
+			<a
+				href="/"
+				class="group flex items-center gap-2 rounded px-1.5 py-1 text-xs font-semibold tracking-tight text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+				title="Back to Mesh Home"
+			>
+				<img
+					src={logo}
+					alt="Mesh Logo"
+					class="h-4.5 w-4.5 rounded object-cover shadow-xs transition-transform group-hover:scale-105"
+				/>
+				<span class="hidden font-bold sm:inline">Mesh</span>
+			</a>
+
+			<div class="mx-1.5 h-3.5 w-px bg-(--surface-2)"></div>
+
+			<!-- Room ID with Click-to-copy Code -->
+			<button
+				type="button"
+				onclick={copyRoomCode}
+				class="flex items-center gap-1.5 rounded px-2 py-1 font-mono text-xs text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1)"
+				title="Click to copy room code ({roomId})"
+			>
+				{#if socket.authRequired}
+					<svg
+						class="h-3 w-3 text-amber-400"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<rect x="3" y="11" width="18" height="11" rx="2" />
+						<path d="M7 11V7a5 5 0 0 1 10 0v4" />
+					</svg>
+				{/if}
+				<span>{roomId}</span>
+				{#if copiedCode}
+					<span class="font-sans text-[10px] font-bold text-emerald-400">Copied!</span>
+				{:else}
+					<svg
+						class="h-3 w-3 text-(--ink-3)"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+						<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+					</svg>
+				{/if}
+			</button>
+
+			<div class="mx-1.5 h-3.5 w-px bg-(--surface-2)"></div>
+
+			<!-- Copy Invite Link / Share CTA -->
+			<button
+				type="button"
+				onclick={copyRoomLink}
+				class="flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-all {copiedLink
+					? 'bg-emerald-500/20 text-emerald-400'
+					: 'bg-(--ink-1) text-(--surface-0) hover:bg-(--ink-1)/90'}"
+				title="Copy shareable invite link"
+			>
+				{#if copiedLink}
+					<svg
+						class="h-3 w-3"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2.5"
+					>
+						<polyline points="20 6 9 17 4 12"></polyline>
+					</svg>
+					<span>Link Copied!</span>
+				{:else}
+					<svg
+						class="h-3 w-3"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+						<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+					</svg>
+					<span class="hidden sm:inline">Share</span>
+				{/if}
+			</button>
+		</div>
 
 		<!-- Top Presence & Room Header -->
 		<PresenceBar
-			{roomId}
 			status={socket.status}
 			currentUser={socket.currentUser}
 			peers={socket.peers}
-			locked={socket.authRequired}
 			{engine}
 			onUpdateUserName={handleUpdateUserName}
 		/>
