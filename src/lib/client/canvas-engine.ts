@@ -9,41 +9,50 @@ import {
 	isShapeInsideMarquee,
 	screenToWorld,
 	simplifyRDP,
-	worldToScreen,
 	type BoundingBox,
 	type ResizeHandle
 } from './math';
 import type { PathPoint, PeerPresence, ShapeRecord, ShapeType } from '../types';
 import type { HistoryAction } from './history.svelte';
+import {
+	FONT_FAMILIES,
+	FONT_SIZES,
+	getFontFamilyCss,
+	calculateTextBounds,
+	wrapText,
+	type FontFamilyKey
+} from './canvas-text';
+import { drawArrowHead, drawPeerCursor, drawShape, renderGrid } from './canvas-render';
+import {
+	exportToPng,
+	exportToSvg,
+	exportToJson,
+	importFromJson,
+	triggerBrowserDownload,
+	escapeXml
+} from './canvas-export';
+
+export {
+	FONT_FAMILIES,
+	FONT_SIZES,
+	getFontFamilyCss,
+	getFontFamilySvg,
+	calculateTextBounds,
+	wrapText,
+	type FontFamilyKey
+} from './canvas-text';
+export { drawArrowHead, drawPeerCursor, drawShape, renderGrid } from './canvas-render';
+export {
+	exportToPng,
+	exportToSvg,
+	exportToJson,
+	importFromJson,
+	triggerBrowserDownload,
+	escapeXml
+} from './canvas-export';
 
 export type ToolMode =
 	'select' | 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note' | 'pan';
-
-export const FONT_FAMILIES = {
-	sans: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-	serif: 'Georgia, Cambria, "Times New Roman", Times, serif',
-	mono: '"JetBrains Mono", Menlo, Monaco, Consolas, "Courier New", monospace'
-} as const;
-
-export type FontFamilyKey = keyof typeof FONT_FAMILIES;
-
-export const FONT_SIZES = [
-	{ label: 'S', value: 14, title: 'Small (14px)' },
-	{ label: 'M', value: 18, title: 'Medium (18px)' },
-	{ label: 'L', value: 28, title: 'Large (28px)' },
-	{ label: 'XL', value: 40, title: 'Extra Large (40px)' }
-] as const;
-
-export function getFontFamilyCss(family?: string): string {
-	if (!family) return FONT_FAMILIES.sans;
-	if (family in FONT_FAMILIES) return FONT_FAMILIES[family as FontFamilyKey];
-	return family;
-}
-
-export function getFontFamilySvg(family?: string): string {
-	const css = getFontFamilyCss(family);
-	return css.replace(/"/g, "'");
-}
 
 export interface ViewportState {
 	panX: number;
@@ -57,14 +66,12 @@ export class CanvasEngine {
 	private staticCtx: CanvasRenderingContext2D;
 	private overlayCtx: CanvasRenderingContext2D;
 
-	// Viewport transforms
 	viewport: ViewportState = {
 		panX: 0,
 		panY: 0,
 		zoom: 1
 	};
 
-	// Interaction state
 	tool: ToolMode = 'select';
 	strokeColor = '#f4f4f5';
 	fillColor = 'transparent';
@@ -76,7 +83,10 @@ export class CanvasEngine {
 	static readonly LIGHT_DEFAULT_STROKE = '#18181b';
 
 	isLightTheme(): boolean {
-		return typeof document !== 'undefined' && document.documentElement.classList.contains('light');
+		return (
+			typeof document !== 'undefined' &&
+			document.documentElement?.classList?.contains('light') === true
+		);
 	}
 
 	defaultStroke(): string {
@@ -89,7 +99,6 @@ export class CanvasEngine {
 		return this.isLightTheme() ? '#fafafa' : '#121214';
 	}
 
-	/** Sync default stroke color with the active theme; call after toggling. */
 	applyTheme() {
 		const want = this.defaultStroke();
 		const other =
@@ -107,7 +116,6 @@ export class CanvasEngine {
 	isSpacePressed = false;
 	isShiftPressed = false;
 
-	// Active operation
 	private isInteracting = false;
 	private interactionType:
 		| 'draw'
@@ -127,23 +135,19 @@ export class CanvasEngine {
 	private currentPoint: { x: number; y: number } = { x: 0, y: 0 };
 	private activePathPoints: PathPoint[] = [];
 
-	// Multi-touch tracking
 	private activePointers = new Map<number, { x: number; y: number }>();
 	private initialPinchDist = 0;
 	private initialPinchMidpoint = { x: 0, y: 0 };
 	private initialPinchZoom = 1;
 	private initialPinchPan = { x: 0, y: 0 };
 
-	// Selection state
 	selectedIds: string[] = [];
 	private dragInitialPositions = new Map<string, { x: number; y: number }>();
 	private dragInitialShapes = new Map<string, ShapeRecord>();
 
-	// Shape repository reference
 	private shapes: Map<string, ShapeRecord> = new Map();
 	private peers: PeerPresence[] = [];
 
-	// Callbacks to reactive Svelte layer
 	onShapesMutated?: (shapes: ShapeRecord[]) => void;
 	onShapesDeleted?: (ids: string[]) => void;
 	onSelectionChanged?: (selectedIds: string[]) => void;
@@ -350,31 +354,7 @@ export class CanvasEngine {
 		fontSize: number,
 		fontFamily: string = 'sans'
 	): { width: number; height: number } {
-		if (!text) {
-			return { width: 140, height: Math.max(Math.round(fontSize * 1.3), 32) };
-		}
-		const lines = text.split('\n');
-		const fFamily = getFontFamilyCss(fontFamily);
-		let maxWidth = 0;
-		if (this.staticCtx) {
-			this.staticCtx.save();
-			this.staticCtx.font = `${fontSize}px ${fFamily}`;
-			for (const line of lines) {
-				const metrics = this.staticCtx.measureText(line);
-				if (metrics.width > maxWidth) {
-					maxWidth = metrics.width;
-				}
-			}
-			this.staticCtx.restore();
-		} else {
-			const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
-			maxWidth = maxLineLength * (fontSize * 0.62);
-		}
-		const lineHeight = Math.round(fontSize * 1.3);
-		return {
-			width: Math.max(Math.ceil(maxWidth + 8), 40),
-			height: Math.max(lines.length * lineHeight, 28)
-		};
+		return calculateTextBounds(text, fontSize, fontFamily, this.staticCtx);
 	}
 
 	setFontFamily(family: string) {
@@ -543,7 +523,7 @@ export class CanvasEngine {
 		};
 	}
 
-	private drawArrowHead(
+	drawArrowHead(
 		ctx: CanvasRenderingContext2D,
 		fromX: number,
 		fromY: number,
@@ -552,37 +532,12 @@ export class CanvasEngine {
 		color: string,
 		width: number
 	) {
-		const headLength = Math.max(width * 4, 12);
-		const angle = Math.atan2(toY - fromY, toX - fromX);
-		const arrowAngle = Math.PI / 6;
-
-		ctx.save();
-		ctx.fillStyle = color;
-		ctx.strokeStyle = color;
-		ctx.lineWidth = width;
-		ctx.beginPath();
-		ctx.moveTo(toX, toY);
-		ctx.lineTo(
-			toX - headLength * Math.cos(angle - arrowAngle),
-			toY - headLength * Math.sin(angle - arrowAngle)
-		);
-		ctx.lineTo(
-			toX - headLength * Math.cos(angle + arrowAngle),
-			toY - headLength * Math.sin(angle + arrowAngle)
-		);
-		ctx.closePath();
-		ctx.fill();
-		ctx.restore();
+		drawArrowHead(ctx, fromX, fromY, toX, toY, color, width);
 	}
-
-	// -------------------------------------------------------------
-	// POINTER EVENT HANDLERS
-	// -------------------------------------------------------------
 
 	handlePointerDown(e: PointerEvent) {
 		this.activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
 
-		// Multi-touch pinch-to-zoom and two-finger pan
 		if (this.activePointers.size === 2) {
 			const [p1, p2] = Array.from(this.activePointers.values());
 			this.initialPinchDist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
@@ -613,7 +568,6 @@ export class CanvasEngine {
 		this.startPoint = worldPos;
 		this.currentPoint = worldPos;
 
-		// Pan mode (or middle mouse button or Space bar held)
 		if (this.tool === 'pan' || e.button === 1 || e.buttons === 4 || this.isSpacePressed) {
 			this.interactionType = 'pan';
 			return;
@@ -645,7 +599,6 @@ export class CanvasEngine {
 		}
 
 		if (this.tool === 'select') {
-			// Hit-test resize handles if single resizable shape is selected
 			if (this.selectedIds.length === 1) {
 				const selectedShape = this.shapes.get(this.selectedIds[0]);
 				if (
@@ -686,7 +639,6 @@ export class CanvasEngine {
 				}
 			}
 
-			// Hit-test shapes in reverse zIndex order (top-most first)
 			const sortedShapes = Array.from(this.shapes.values()).sort((a, b) => b.zIndex - a.zIndex);
 			const hit = sortedShapes.find((s) => hitTestShape(worldPos, s));
 
@@ -875,7 +827,6 @@ export class CanvasEngine {
 			const dx = worldPos.x - this.startPoint.x;
 			const dy = worldPos.y - this.startPoint.y;
 
-			// Optimistically move shapes in local map during drag
 			for (const [id, initialPos] of this.dragInitialPositions) {
 				const shape = this.shapes.get(id);
 				if (shape) {
@@ -1145,7 +1096,6 @@ export class CanvasEngine {
 		e.preventDefault();
 
 		if (e.ctrlKey || e.metaKey) {
-			// Zoom around cursor
 			const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
 			const newZoom = Math.min(Math.max(this.viewport.zoom * zoomFactor, 0.1), 5.0);
 
@@ -1156,7 +1106,6 @@ export class CanvasEngine {
 			this.viewport.panY = mouseY - (mouseY - this.viewport.panY) * (newZoom / this.viewport.zoom);
 			this.viewport.zoom = newZoom;
 		} else {
-			// Pan
 			this.viewport.panX -= e.deltaX;
 			this.viewport.panY -= e.deltaY;
 		}
@@ -1264,7 +1213,7 @@ export class CanvasEngine {
 		}
 	}
 
-	private getNextZIndex(): number {
+	getNextZIndex(): number {
 		let maxZ = 0;
 		for (const s of this.shapes.values()) {
 			if (s.zIndex > maxZ) maxZ = s.zIndex;
@@ -1321,14 +1270,6 @@ export class CanvasEngine {
 		this.startTextEdit(shape);
 	}
 
-	// -------------------------------------------------------------
-	// RENDERING PIPELINE
-	// -------------------------------------------------------------
-
-	/**
-	 * Buffer Canvas: Renders committed shapes in z-index order.
-	 * Only called when shapes or viewport changes.
-	 */
 	renderBuffer() {
 		const ctx = this.staticCtx;
 		const width = window.innerWidth;
@@ -1337,25 +1278,30 @@ export class CanvasEngine {
 		ctx.save();
 		ctx.clearRect(0, 0, width, height);
 
-		// Apply viewport pan and zoom
 		ctx.translate(this.viewport.panX, this.viewport.panY);
 		ctx.scale(this.viewport.zoom, this.viewport.zoom);
 
-		// Render grid dots for spatial orientation
-		this.renderGrid(ctx);
+		renderGrid(
+			ctx,
+			this.viewport.panX,
+			this.viewport.panY,
+			this.viewport.zoom,
+			this.isLightTheme(),
+			width,
+			height
+		);
 
-		// Render shapes in sorted zIndex order
 		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
 		for (const shape of sorted) {
-			this.drawShape(ctx, shape);
+			drawShape(ctx, shape, this.defaultStroke(), {
+				editingShapeId: this.editingShapeId,
+				isStaticCtx: true
+			});
 		}
 
 		ctx.restore();
 	}
 
-	/**
-	 * Overlay Canvas: 60fps loop for active stroke, cursors, and selection box.
-	 */
 	renderOverlay() {
 		const ctx = this.overlayCtx;
 		const width = window.innerWidth;
@@ -1367,7 +1313,6 @@ export class CanvasEngine {
 		ctx.translate(this.viewport.panX, this.viewport.panY);
 		ctx.scale(this.viewport.zoom, this.viewport.zoom);
 
-		// 1. Draw in-progress active pen stroke
 		if (this.interactionType === 'draw' && this.activePathPoints.length > 1) {
 			ctx.beginPath();
 			ctx.strokeStyle = this.strokeColor;
@@ -1382,7 +1327,6 @@ export class CanvasEngine {
 			ctx.stroke();
 		}
 
-		// 2. Draw in-progress line or arrow preview
 		if (this.interactionType === 'create_line') {
 			const end = this.calculateLineEndPoint(
 				this.startPoint,
@@ -1402,7 +1346,7 @@ export class CanvasEngine {
 			ctx.stroke();
 
 			if (this.tool === 'arrow') {
-				this.drawArrowHead(
+				drawArrowHead(
 					ctx,
 					this.startPoint.x,
 					this.startPoint.y,
@@ -1415,7 +1359,6 @@ export class CanvasEngine {
 			ctx.restore();
 		}
 
-		// 3. Draw in-progress shape preview (rect, ellipse, sticky note)
 		if (this.interactionType === 'create_shape') {
 			const x = Math.min(this.startPoint.x, this.currentPoint.x);
 			const y = Math.min(this.startPoint.y, this.currentPoint.y);
@@ -1446,7 +1389,6 @@ export class CanvasEngine {
 			ctx.restore();
 		}
 
-		// 3. Draw selection bounding box and handles
 		if (this.selectedIds.length > 0) {
 			const isSingleSelection = this.selectedIds.length === 1;
 			const singleShape = isSingleSelection ? this.shapes.get(this.selectedIds[0]) : null;
@@ -1458,7 +1400,7 @@ export class CanvasEngine {
 				if (shape) {
 					const b = getShapeBounds(shape);
 					ctx.save();
-					ctx.strokeStyle = '#6366f1'; // Electric Indigo selection color
+					ctx.strokeStyle = '#6366f1';
 					ctx.lineWidth = 1.5 / this.viewport.zoom;
 					ctx.setLineDash([4 / this.viewport.zoom, 4 / this.viewport.zoom]);
 					if (canResizeSingle) {
@@ -1470,7 +1412,6 @@ export class CanvasEngine {
 				}
 			}
 
-			// Draw 8 resize handles for single selected resizable shape
 			if (canResizeSingle && singleShape) {
 				const b = getShapeBounds(singleShape);
 				const handles = getResizeHandles(b);
@@ -1482,7 +1423,7 @@ export class CanvasEngine {
 				ctx.fillStyle = '#ffffff';
 				ctx.strokeStyle = '#6366f1';
 				ctx.lineWidth = 1.5 / this.viewport.zoom;
-				ctx.setLineDash([]); // solid border for handles
+				ctx.setLineDash([]);
 
 				for (const pos of Object.values(handles)) {
 					ctx.beginPath();
@@ -1493,7 +1434,6 @@ export class CanvasEngine {
 			}
 		}
 
-		// 4. Draw marquee selection rectangle
 		if (this.interactionType === 'marquee') {
 			const minX = Math.min(this.startPoint.x, this.currentPoint.x);
 			const minY = Math.min(this.startPoint.y, this.currentPoint.y);
@@ -1509,485 +1449,53 @@ export class CanvasEngine {
 			ctx.restore();
 		}
 
-		// 5. Draw remote peer cursors
 		for (const peer of this.peers) {
 			if (peer.cursor) {
-				this.drawPeerCursor(ctx, peer);
+				drawPeerCursor(ctx, peer);
 			}
 		}
 
 		ctx.restore();
 	}
 
-	private renderGrid(ctx: CanvasRenderingContext2D) {
-		const dotSpacing = 32;
-		const width = window.innerWidth;
-		const height = window.innerHeight;
-
-		const startWorld = screenToWorld(
-			0,
-			0,
-			this.viewport.panX,
-			this.viewport.panY,
-			this.viewport.zoom
-		);
-		const endWorld = screenToWorld(
-			width,
-			height,
-			this.viewport.panX,
-			this.viewport.panY,
-			this.viewport.zoom
-		);
-
-		const startX = Math.floor(startWorld.x / dotSpacing) * dotSpacing;
-		const startY = Math.floor(startWorld.y / dotSpacing) * dotSpacing;
-
-		ctx.save();
-		ctx.fillStyle = this.isLightTheme() ? '#d4d4d8' : '#27272a'; // subtle grid dots
-
-		for (let x = startX; x <= endWorld.x; x += dotSpacing) {
-			for (let y = startY; y <= endWorld.y; y += dotSpacing) {
-				ctx.fillRect(x, y, 1.5, 1.5);
-			}
-		}
-		ctx.restore();
-	}
-
-	private drawShape(ctx: CanvasRenderingContext2D, shape: ShapeRecord) {
-		ctx.save();
-
-		ctx.strokeStyle = shape.stroke || this.defaultStroke();
-		ctx.fillStyle = shape.fill || 'transparent';
-		ctx.lineWidth = shape.strokeWidth || 2;
-		ctx.lineCap = 'round';
-		ctx.lineJoin = 'round';
-
-		if (shape.type === 'path') {
-			const points: PathPoint[] = shape.data?.points ?? [];
-			if (points.length >= 2) {
-				ctx.beginPath();
-				ctx.moveTo(points[0].x, points[0].y);
-				for (let i = 1; i < points.length; i++) {
-					ctx.lineTo(points[i].x, points[i].y);
-				}
-				ctx.stroke();
-
-				if (shape.data?.isArrow && points.length >= 2) {
-					const p1 = points[points.length - 2];
-					const p2 = points[points.length - 1];
-					this.drawArrowHead(
-						ctx,
-						p1.x,
-						p1.y,
-						p2.x,
-						p2.y,
-						shape.stroke || this.defaultStroke(),
-						shape.strokeWidth || 2
-					);
-				}
-			}
-		} else if (shape.type === 'rectangle') {
-			ctx.beginPath();
-			const rx = Math.min(shape.x, shape.x + shape.width);
-			const ry = Math.min(shape.y, shape.y + shape.height);
-			const rw = Math.max(Math.abs(shape.width), 1);
-			const rh = Math.max(Math.abs(shape.height), 1);
-			ctx.roundRect(rx, ry, rw, rh, 4);
-			if (shape.fill && shape.fill !== 'transparent') ctx.fill();
-			ctx.stroke();
-		} else if (shape.type === 'ellipse') {
-			ctx.beginPath();
-			const rx = Math.max(Math.abs(shape.width / 2), 1);
-			const ry = Math.max(Math.abs(shape.height / 2), 1);
-			ctx.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, rx, ry, 0, 0, Math.PI * 2);
-			if (shape.fill && shape.fill !== 'transparent') ctx.fill();
-			ctx.stroke();
-		} else if (shape.type === 'text') {
-			if (this.editingShapeId !== shape.id || ctx !== this.staticCtx) {
-				const text = shape.data?.text || '';
-				if (text) {
-					const fSize = shape.data?.fontSize || 18;
-					const fFamily = getFontFamilyCss(shape.data?.fontFamily || 'sans');
-					ctx.font = `${fSize}px ${fFamily}`;
-					ctx.fillStyle = shape.stroke || this.defaultStroke();
-					ctx.textBaseline = 'top';
-					const lineHeight = Math.round(fSize * 1.3);
-					const lines = text.split('\n');
-					let curY = shape.y;
-					for (const line of lines) {
-						ctx.fillText(line, shape.x, curY);
-						curY += lineHeight;
-					}
-				}
-			}
-		} else if (shape.type === 'sticky_note') {
-			// Sticky note body
-			ctx.save();
-			ctx.fillStyle = shape.fill || '#fef08a'; // pale yellow
-			ctx.strokeStyle = shape.stroke || '#eab308';
-			ctx.lineWidth = 1;
-			ctx.beginPath();
-			ctx.roundRect(shape.x, shape.y, shape.width, shape.height, 6);
-			ctx.fill();
-			ctx.stroke();
-
-			// Sticky note text
-			if (this.editingShapeId !== shape.id || ctx !== this.staticCtx) {
-				const text = shape.data?.text || '';
-				if (text) {
-					ctx.font = '14px system-ui, -apple-system, sans-serif';
-					ctx.fillStyle = '#18181b'; // dark text on yellow
-					ctx.textBaseline = 'top';
-
-					const padding = 12;
-					const maxWidth = Math.max(shape.width - padding * 2, 20);
-					const maxHeight = Math.max(shape.height - padding * 2, 20);
-					const lineHeight = 18;
-
-					ctx.save();
-					ctx.beginPath();
-					ctx.rect(shape.x + padding, shape.y + padding, maxWidth, maxHeight);
-					ctx.clip();
-
-					const lines = this.wrapText(ctx, text, maxWidth);
-					let currentY = shape.y + padding;
-					for (const line of lines) {
-						if (currentY + lineHeight > shape.y + shape.height) break;
-						ctx.fillText(line, shape.x + padding, currentY);
-						currentY += lineHeight;
-					}
-					ctx.restore();
-				}
-			}
-			ctx.restore();
-		}
-
-		ctx.restore();
-	}
-
-	private wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string[] {
-		const result: string[] = [];
-		const rawLines = text.split('\n');
-
-		for (const rawLine of rawLines) {
-			if (rawLine === '') {
-				result.push('');
-				continue;
-			}
-			const words = rawLine.split(' ');
-			let currentLine = '';
-
-			for (let i = 0; i < words.length; i++) {
-				const word = words[i];
-				const testLine = currentLine ? `${currentLine} ${word}` : word;
-				if (ctx.measureText(testLine).width > maxWidth && currentLine) {
-					result.push(currentLine);
-					currentLine = word;
-				} else {
-					currentLine = testLine;
-				}
-
-				if (ctx.measureText(currentLine).width > maxWidth) {
-					let sub = '';
-					for (const char of currentLine) {
-						if (ctx.measureText(sub + char).width > maxWidth && sub) {
-							result.push(sub);
-							sub = char;
-						} else {
-							sub += char;
-						}
-					}
-					currentLine = sub;
-				}
-			}
-			if (currentLine) {
-				result.push(currentLine);
-			}
-		}
-
-		return result;
-	}
-
-	private drawPeerCursor(ctx: CanvasRenderingContext2D, peer: PeerPresence) {
-		if (!peer.cursor) return;
-
-		ctx.save();
-		const { x, y } = peer.cursor;
-		const color = peer.color || '#06b6d4';
-
-		// Draw SVG-style cursor arrow
-		ctx.fillStyle = color;
-		ctx.strokeStyle = '#000000';
-		ctx.lineWidth = 1;
-
-		ctx.beginPath();
-		ctx.moveTo(x, y);
-		ctx.lineTo(x, y + 15);
-		ctx.lineTo(x + 4, y + 11);
-		ctx.lineTo(x + 8, y + 18);
-		ctx.lineTo(x + 11, y + 16);
-		ctx.lineTo(x + 7, y + 10);
-		ctx.lineTo(x + 12, y + 10);
-		ctx.closePath();
-		ctx.fill();
-		ctx.stroke();
-
-		// Draw peer name pill
-		const name = peer.name || 'Anonymous';
-		ctx.font = '11px system-ui, sans-serif';
-		const textWidth = ctx.measureText(name).width;
-
-		ctx.fillStyle = color;
-		ctx.beginPath();
-		ctx.roundRect(x + 14, y + 12, textWidth + 8, 18, 4);
-		ctx.fill();
-
-		ctx.fillStyle = '#000000';
-		ctx.fillText(name, x + 18, y + 25);
-
-		ctx.restore();
-	}
-
-	// -------------------------------------------------------------
-	// EXPORT UTILITIES (PRD §10 Phase 4)
-	// -------------------------------------------------------------
-
-	private triggerBrowserDownload(source: string | Blob, filename: string) {
-		const isBlob = typeof source !== 'string';
-		const url = isBlob ? URL.createObjectURL(source) : source;
-		const a = document.createElement('a');
-		a.style.display = 'none';
-		a.href = url;
-		a.download = filename;
-		document.body.appendChild(a);
-		a.click();
-		setTimeout(() => {
-			if (document.body.contains(a)) {
-				document.body.removeChild(a);
-			}
-			if (isBlob) {
-				URL.revokeObjectURL(url);
-			}
-		}, 300);
+	triggerBrowserDownload(source: string | Blob, filename: string) {
+		triggerBrowserDownload(source, filename);
 	}
 
 	exportToPng(filename = 'mesh-whiteboard.png', scale = 2) {
-		if (this.shapes.size === 0) {
-			alert('Canvas is empty. Draw something before exporting.');
-			return;
-		}
-
-		// Calculate total bounding box of all shapes
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-
-		for (const shape of this.shapes.values()) {
-			const b = getShapeBounds(shape);
-			if (b.minX < minX) minX = b.minX;
-			if (b.minY < minY) minY = b.minY;
-			if (b.maxX > maxX) maxX = b.maxX;
-			if (b.maxY > maxY) maxY = b.maxY;
-		}
-
-		const padding = 40;
-		const w = Math.max(maxX - minX + padding * 2, 100);
-		const h = Math.max(maxY - minY + padding * 2, 100);
-
-		const offscreen = document.createElement('canvas');
-		offscreen.width = Math.round(w * scale);
-		offscreen.height = Math.round(h * scale);
-		const offCtx = offscreen.getContext('2d');
-		if (!offCtx) return;
-
-		offCtx.scale(scale, scale);
-
-		// Canvas background follows the active theme
-		offCtx.fillStyle = this.themeCanvasBg();
-		offCtx.fillRect(0, 0, w, h);
-
-		offCtx.translate(-minX + padding, -minY + padding);
-
-		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
-		for (const shape of sorted) {
-			this.drawShape(offCtx, shape);
-		}
-
-		const dataUrl = offscreen.toDataURL('image/png');
-		this.triggerBrowserDownload(dataUrl, filename);
+		exportToPng(
+			this.shapes,
+			this.themeCanvasBg(),
+			this.defaultStroke(),
+			filename,
+			scale,
+			(source, name) => this.triggerBrowserDownload(source, name)
+		);
 	}
 
 	exportToSvg(filename = 'mesh-whiteboard.svg') {
-		if (this.shapes.size === 0) {
-			alert('Canvas is empty. Draw something before exporting.');
-			return;
-		}
-
-		let minX = Infinity;
-		let minY = Infinity;
-		let maxX = -Infinity;
-		let maxY = -Infinity;
-
-		for (const shape of this.shapes.values()) {
-			const b = getShapeBounds(shape);
-			if (b.minX < minX) minX = b.minX;
-			if (b.minY < minY) minY = b.minY;
-			if (b.maxX > maxX) maxX = b.maxX;
-			if (b.maxY > maxY) maxY = b.maxY;
-		}
-
-		const padding = 40;
-		const w = Math.max(maxX - minX + padding * 2, 100);
-		const h = Math.max(maxY - minY + padding * 2, 100);
-
-		let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX - padding} ${minY - padding} ${w} ${h}" width="${w}" height="${h}">\n`;
-		svgContent += `<rect x="${minX - padding}" y="${minY - padding}" width="${w}" height="${h}" fill="${this.themeCanvasBg()}"/>\n`;
-
-		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
-		for (const shape of sorted) {
-			if (shape.type === 'path') {
-				const points: PathPoint[] = shape.data?.points ?? [];
-				if (points.length >= 2) {
-					const d = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-					svgContent += `<path d="${d}" fill="none" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
-
-					if (shape.data?.isArrow && points.length >= 2) {
-						const p1 = points[points.length - 2];
-						const p2 = points[points.length - 1];
-						const angle = Math.atan2(p2.y - p1.y, p2.x - p1.x);
-						const headLength = Math.max((shape.strokeWidth || 2) * 4, 12);
-						const arrowAngle = Math.PI / 6;
-						const x1 = p2.x - headLength * Math.cos(angle - arrowAngle);
-						const y1 = p2.y - headLength * Math.sin(angle - arrowAngle);
-						const x2 = p2.x - headLength * Math.cos(angle + arrowAngle);
-						const y2 = p2.y - headLength * Math.sin(angle + arrowAngle);
-						svgContent += `<polygon points="${p2.x},${p2.y} ${x1},${y1} ${x2},${y2}" fill="${shape.stroke}"/>\n`;
-					}
-				}
-			} else if (shape.type === 'rectangle') {
-				const rx = Math.min(shape.x, shape.x + shape.width);
-				const ry = Math.min(shape.y, shape.y + shape.height);
-				const rw = Math.max(Math.abs(shape.width), 1);
-				const rh = Math.max(Math.abs(shape.height), 1);
-				svgContent += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="4" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
-			} else if (shape.type === 'ellipse') {
-				const rx = Math.max(Math.abs(shape.width / 2), 1);
-				const ry = Math.max(Math.abs(shape.height / 2), 1);
-				const cx = shape.x + shape.width / 2;
-				const cy = shape.y + shape.height / 2;
-				svgContent += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
-			} else if (shape.type === 'text') {
-				const text = shape.data?.text || '';
-				const fSize = shape.data?.fontSize || 18;
-				const fFamily = getFontFamilySvg(shape.data?.fontFamily || 'sans');
-				const lines = text.split('\n');
-				svgContent += `<text x="${shape.x}" y="${shape.y + fSize}" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
-				for (let i = 0; i < lines.length; i++) {
-					const dy = i === 0 ? '0' : '1.3em';
-					svgContent += `<tspan x="${shape.x}" dy="${dy}">${this.escapeXml(lines[i])}</tspan>\n`;
-				}
-				svgContent += `</text>\n`;
-			} else if (shape.type === 'sticky_note') {
-				const text = shape.data?.text || '';
-				const lines = text.split('\n');
-				svgContent += `<g>\n`;
-				svgContent += `<rect x="${shape.x}" y="${shape.y}" width="${shape.width}" height="${shape.height}" rx="6" fill="${shape.fill || '#fef08a'}" stroke="${shape.stroke || '#eab308'}" stroke-width="1"/>\n`;
-				if (lines.length > 0 && lines.some((l: string) => l.length > 0)) {
-					svgContent += `<text x="${shape.x + 12}" y="${shape.y + 24}" font-family="system-ui, sans-serif" font-size="14" fill="#18181b">\n`;
-					for (let i = 0; i < lines.length; i++) {
-						const dy = i === 0 ? '0' : '1.3em';
-						svgContent += `<tspan x="${shape.x + 12}" dy="${dy}">${this.escapeXml(lines[i])}</tspan>\n`;
-					}
-					svgContent += `</text>\n`;
-				}
-				svgContent += `</g>\n`;
-			}
-		}
-
-		svgContent += `</svg>`;
-
-		const blob = new Blob([svgContent], { type: 'image/svg+xml;charset=utf-8' });
-		this.triggerBrowserDownload(blob, filename);
-	}
-
-	private escapeXml(str: string): string {
-		return str
-			.replace(/&/g, '&amp;')
-			.replace(/</g, '&lt;')
-			.replace(/>/g, '&gt;')
-			.replace(/"/g, '&quot;')
-			.replace(/'/g, '&apos;');
+		exportToSvg(this.shapes, this.themeCanvasBg(), filename, (source, name) =>
+			this.triggerBrowserDownload(source, name)
+		);
 	}
 
 	exportToJson(filename = 'mesh-whiteboard.json') {
-		if (this.shapes.size === 0) {
-			alert('Canvas is empty. Draw something before exporting.');
-			return;
-		}
-
-		const exportData = {
-			app: 'Mesh',
-			version: '1.0.0',
-			exportedAt: new Date().toISOString(),
-			shapes: Array.from(this.shapes.values())
-		};
-
-		const blob = new Blob([JSON.stringify(exportData, null, 2)], {
-			type: 'application/json;charset=utf-8'
-		});
-		this.triggerBrowserDownload(blob, filename);
+		exportToJson(this.shapes, filename, (source, name) =>
+			this.triggerBrowserDownload(source, name)
+		);
 	}
 
 	importFromJson(jsonString: string): ShapeRecord[] | null {
-		try {
-			const parsed = JSON.parse(jsonString);
-			const rawShapes = Array.isArray(parsed) ? parsed : parsed.shapes;
-			if (!Array.isArray(rawShapes) || rawShapes.length === 0) {
-				alert('No valid shapes found in JSON file.');
-				return null;
-			}
-
-			const now = Date.now();
-			let baseZ = this.getNextZIndex();
-			const importedShapes: ShapeRecord[] = [];
-
-			for (const item of rawShapes) {
-				if (!item.type || typeof item.x !== 'number' || typeof item.y !== 'number') {
-					continue;
-				}
-				const shape: ShapeRecord = {
-					id: 'shape_' + Math.random().toString(36).substring(2, 9),
-					type: item.type,
-					x: item.x,
-					y: item.y,
-					width: item.width || 50,
-					height: item.height || 50,
-					fill: item.fill || 'transparent',
-					stroke: item.stroke || this.defaultStroke(),
-					strokeWidth: item.strokeWidth || 2,
-					rotation: item.rotation || 0,
-					zIndex: baseZ++,
-					data: item.data,
-					createdBy: '',
-					updatedAt: now
-				};
-				importedShapes.push(shape);
-			}
-
-			if (importedShapes.length > 0) {
-				this.onShapesMutated?.(importedShapes);
-				this.onActionRecorded?.({
-					type: 'modify',
-					before: [],
-					after: importedShapes
-				});
-				return importedShapes;
-			}
-			return null;
-		} catch {
-			alert('Invalid JSON file format.');
-			return null;
+		const importedShapes = importFromJson(jsonString, this.getNextZIndex(), this.defaultStroke());
+		if (importedShapes && importedShapes.length > 0) {
+			this.onShapesMutated?.(importedShapes);
+			this.onActionRecorded?.({
+				type: 'modify',
+				before: [],
+				after: importedShapes
+			});
+			return importedShapes;
 		}
+		return null;
 	}
 }
