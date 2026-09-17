@@ -74,7 +74,10 @@ Open [http://localhost:4173](http://localhost:4173) in your browser. Open an Inc
 
 ### 👥 Real-Time Collaboration & Presence
 
-- **Ephemeral Remote Cursors:** Remote pointer positions broadcast at 30Hz with smooth interpolated rendering.
+- **Adaptive Ephemeral Cursors:** Remote pointer positions broadcast at an adaptive 15Hz (~66ms) with smooth client-side interpolation.
+- **Solo Room Silence:** When alone in a room, continuous cursor streaming is suppressed, dropping solo presence overhead from 108,000 requests/hour down to zero and keeping usage safely within Cloudflare Free Tier quotas.
+- **Deadband Filtering:** Sub-2px micro-movements and resting cursor states are skipped to eliminate network jitter.
+- **Background Inactivity Pause:** Switching to another browser tab (`document.visibilityState === 'hidden'`) automatically hides your cursor and suspends presence broadcasts until returning.
 - **Custom Identity:** Live user avatars with customizable display names and signature colors saved in local storage.
 - **Zero-Storage Presence:** Cursor coordinates and selection packets are routed exclusively in memory and never touch disk.
 
@@ -265,6 +268,7 @@ bun run scripts/test-security-fixes.ts
 bun run scripts/test-room-link-parser.ts
 bun run scripts/test-history.ts
 bun run scripts/test-export-import.ts
+bun run scripts/test-presence-quota.ts
 
 # Run live integration tests (local edge server on :8788 required)
 bun run scripts/test-handshake.ts
@@ -309,7 +313,7 @@ All WebSocket messages are encoded as JSON strings over standard secure WebSocke
 
 ### Client to Server (C2S)
 
-- `presence:update`: Broadcasts local cursor coordinates `(x, y)` and selected shape IDs at 30Hz.
+- `presence:update`: Broadcasts local cursor coordinates `(x, y)` and selected shape IDs with adaptive 15Hz throttling.
 - `room:auth`: Submits a room password for authentication.
 - `room:set_password`: Sets (or, when authed, changes) the room password.
 - `shape:upsert`: Sends an array of created or modified `shapes[]` with millisecond timestamps.
