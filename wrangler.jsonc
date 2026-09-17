@@ -30,7 +30,7 @@
 	},
 	"routes": [
 		{
-			"pattern": "app.mesh.asy.web.id",
+			"pattern": "app-mesh.asy.web.id",
 			"custom_domain": true
 		}
 	],
