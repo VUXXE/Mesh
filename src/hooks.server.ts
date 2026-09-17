@@ -2,22 +2,8 @@ import type { Handle } from '@sveltejs/kit';
 
 const ROOM_ID_REGEX = /^[a-zA-Z0-9_-]{3,64}$/;
 
-function generateRoomId(): string {
-	const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
-	let result = '';
-	for (let i = 0; i < 6; i++) {
-		result += chars.charAt(Math.floor(Math.random() * chars.length));
-	}
-	return `room-${result}`;
-}
-
 export const handle: Handle = async ({ event, resolve }) => {
 	const { pathname } = event.url;
-
-	if (pathname === '/') {
-		return Response.redirect(new URL(`/room/${generateRoomId()}`, event.url), 302);
-	}
-
 	const match = pathname.match(/^\/api\/room\/([^/]+)\/ws$/);
 
 	if (match) {
