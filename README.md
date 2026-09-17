@@ -200,18 +200,21 @@ docker run -d \
 - [Bun](https://bun.sh) (v1.1+)
 - Node.js (v20+ or v22+)
 
-### Setup
+### Quick Start (Full-Stack)
+
+Run the complete whiteboard application locally with live WebSockets and embedded SQLite persistence in a single command:
 
 ```bash
-# Install dependencies
+# 1. Install dependencies
 bun install
 
-# Generate Cloudflare Worker TypeScript types
-bun run gen
-
-# Run the development server
-bun run dev
+# 2. Start the full-stack edge application
+bun start
 ```
+
+Access the whiteboard at `http://localhost:4173`.
+
+> **Tip (Frontend UI HMR):** For rapid component or CSS prototyping with instant Vite HMR, run `bun run dev` (`http://localhost:5173`). For real-time multi-user syncing and room persistence, use `bun start`.
 
 ### Verification & Testing
 

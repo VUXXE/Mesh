@@ -6,8 +6,9 @@
 	"type": "module",
 	"scripts": {
 		"dev": "vite dev",
+		"start": "bun run build && wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
 		"build": "wrangler types && vite build && bun run scripts/inject-exports.ts",
-		"preview": "wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
+		"preview": "bun run build && wrangler dev .svelte-kit/cloudflare/_worker.js --port 4173",
 		"deploy": "bun run build && wrangler deploy",
 		"prepare": "svelte-kit sync || echo ''",
 		"check": "wrangler types && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
