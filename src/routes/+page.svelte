@@ -156,7 +156,7 @@
 	<title>Mesh: Serverless Real-Time Vector Whiteboard</title>
 	<meta
 		name="description"
-		content="Fast, distraction-free collaborative vector whiteboard on Cloudflare Workers and Svelte 5. Sub-16ms drawing feedback, embedded SQLite, and 30Hz ephemeral presence."
+		content="Fast, distraction-free collaborative vector whiteboard on Cloudflare Workers and Svelte 5. Sub-16ms drawing feedback, embedded SQLite, and adaptive ephemeral presence."
 	/>
 </svelte:head>
 
@@ -277,7 +277,7 @@
 					Fast, distraction-free whiteboard on the edge.
 				</h1>
 				<p class="mt-4 text-base leading-relaxed text-(--ink-2) sm:text-lg">
-					Built for engineers and designers. Sub-16ms vector input, 30Hz ephemeral presence, and
+					Built for engineers and designers. Sub-16ms vector input, adaptive ephemeral presence, and
 					embedded SQLite persistence. No sign-ups, no cookies, no tracking. Create a room and start
 					collaborating in seconds.
 				</p>
@@ -484,7 +484,7 @@
 							</div>
 							<p class="mt-1 font-mono text-[10px] text-(--ink-3)">WhiteboardRoom isolate</p>
 							<div class="mt-2 flex items-center gap-1 font-mono text-[9px] text-cyan-400">
-								<span>30Hz presence broadcast</span>
+								<span>15Hz adaptive presence</span>
 							</div>
 						</div>
 
@@ -580,8 +580,8 @@
 					<p class="mt-1 text-xs text-(--ink-2)">Input-to-render loop</p>
 				</div>
 				<div class="text-center sm:text-left">
-					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">30 Hz</p>
-					<p class="mt-1 text-xs text-(--ink-2)">Ephemeral presence stream</p>
+					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">15 Hz</p>
+					<p class="mt-1 text-xs text-(--ink-2)">Adaptive presence stream</p>
 				</div>
 				<div class="text-center sm:text-left">
 					<p class="text-2xl font-black text-(--ink-1) tabular-nums sm:text-3xl">50 Peers</p>
@@ -650,10 +650,11 @@
 							<path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
 						</svg>
 					</div>
-					<h3 class="mt-4 text-base font-bold text-(--ink-1)">30Hz Ephemeral Presence</h3>
+					<h3 class="mt-4 text-base font-bold text-(--ink-1)">Adaptive Ephemeral Presence</h3>
 					<p class="mt-2 text-xs leading-relaxed text-(--ink-2)">
-						Live remote cursors and active shape selections stream in memory at 30Hz. Presence
-						packets never write to disk or pollute SQLite databases.
+						Live remote cursors and shape selections stream at an adaptive 15Hz with deadband
+						filtering and solo-room silence. Keeps free-tier usage minimal with zero SQLite disk
+						writes.
 					</p>
 				</div>
 
@@ -921,6 +922,12 @@
 						<span class="font-semibold text-(--ink-1)">Conflict Resolution</span>
 						<span class="font-mono text-(--ink-2)"
 							>Monotonic Last-Write-Wins (LWW) with clock skew cap</span
+						>
+					</div>
+					<div class="flex flex-col justify-between px-6 py-4 sm:flex-row sm:items-center">
+						<span class="font-semibold text-(--ink-1)">Presence Broadcast</span>
+						<span class="font-mono text-(--ink-2)"
+							>Adaptive 15Hz with solo silence and deadband filtering</span
 						>
 					</div>
 					<div class="flex flex-col justify-between px-6 py-4 sm:flex-row sm:items-center">
