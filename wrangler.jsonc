@@ -28,6 +28,12 @@
 			"invocation_logs": true
 		}
 	},
+	"routes": [
+		{
+			"pattern": "app.mesh.asy.web.id",
+			"custom_domain": true
+		}
+	],
 	"workers_dev": true,
 	"preview_urls": true
 }
