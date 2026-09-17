@@ -181,254 +181,272 @@ export class WhiteboardRoom extends DurableObject {
 		}
 
 		switch (payload.type) {
-			case 'room:auth': {
-				if (!this.hasPassword()) {
-					this.markAuthed(ws);
-					this.authFailures.delete(ws);
-					ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
-					this.sendFullSync(ws);
-					break;
-				}
-
-				const failState = this.authFailures.get(ws);
-				if (failState && Date.now() < failState.lockedUntil) {
-					ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
-					return;
-				}
-
-				const ok = await this.verifyPassword(payload.password ?? '');
-				if (ok) {
-					this.authFailures.delete(ws);
-					this.markAuthed(ws);
-					ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
-					this.sendFullSync(ws);
-				} else {
-					const count = (failState?.failures ?? 0) + 1;
-					if (count >= 10) {
-						ws.close(1008, 'Too many failed authentication attempts');
-						this.cleanupSocket(ws);
-						return;
-					} else if (count >= 5) {
-						this.authFailures.set(ws, { failures: count, lockedUntil: Date.now() + 5000 });
-					} else {
-						this.authFailures.set(ws, { failures: count, lockedUntil: 0 });
-					}
-					ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
-				}
+			case 'room:auth':
+				await this.handleAuth(ws, payload);
 				break;
-			}
-
-			case 'room:set_password': {
-				const pw = payload.password ?? '';
-				if (pw.length < MIN_PASSWORD_LENGTH || pw.length > MAX_PASSWORD_LENGTH) {
-					return;
-				}
-				// Setting a new password is open when the room has none yet;
-				// changing an existing one requires an authed socket.
-				if (this.hasPassword() && !this.isAuthed(ws)) {
-					return;
-				}
-				await this.setPassword(pw);
-				this.markAuthed(ws);
-				ws.send(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage));
-				// Broadcast notification to peers with requireAuth = false so they know password is required
-				this.broadcast(
-					JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage),
-					ws,
-					false
-				);
-				this.sendFullSync(ws);
+			case 'room:set_password':
+				await this.handleSetPassword(ws, payload);
 				break;
-			}
-
-			case 'presence:update': {
-				if (this.hasPassword() && !this.isAuthed(ws)) {
-					return;
-				}
-				// Ephemeral presence: MUST NEVER touch SQLite (PRD FR-2.4)
-				const attachment: PeerAttachment = {
-					userId: payload.userId,
-					name: payload.name,
-					color: payload.color,
-					cursor: payload.cursor,
-					selectedIds: payload.selectedIds,
-					authed: this.isAuthed(ws)
-				};
-				ws.serializeAttachment(attachment);
-
-				const presenceMsg: S2CMessage = {
-					type: 'presence:peer',
-					userId: payload.userId,
-					name: payload.name,
-					color: payload.color,
-					cursor: payload.cursor,
-					selectedIds: payload.selectedIds
-				};
-				this.broadcast(JSON.stringify(presenceMsg), ws);
+			case 'presence:update':
+				this.handlePresence(ws, payload);
 				break;
-			}
-
-			case 'shape:upsert': {
-				if (!payload.shapes || !Array.isArray(payload.shapes) || payload.shapes.length === 0) {
-					return;
-				}
-
-				if (this.hasPassword() && !this.isAuthed(ws)) {
-					return;
-				}
-
-				const existingCountRow = this.ctx.storage.sql
-					.exec<{ count: number }>('SELECT COUNT(*) as count FROM shapes')
-					.one();
-				const currentCount = existingCountRow?.count ?? 0;
-
-				// Limit of 10,000 shapes per room (PRD §2, §8.1)
-				if (currentCount >= 10000) {
-					return;
-				}
-
-				const senderAttachment = ws.deserializeAttachment() as PeerAttachment | null;
-				const senderUserId = senderAttachment?.userId ?? 'anonymous';
-
-				const upsertStmt = `
-					INSERT INTO shapes (
-						id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-					ON CONFLICT(id) DO UPDATE SET
-						x = excluded.x,
-						y = excluded.y,
-						width = excluded.width,
-						height = excluded.height,
-						fill = excluded.fill,
-						stroke = excluded.stroke,
-						stroke_width = excluded.stroke_width,
-						rotation = excluded.rotation,
-						z_index = excluded.z_index,
-						data = excluded.data,
-						updated_at = excluded.updated_at
-					WHERE excluded.updated_at >= shapes.updated_at;
-				`;
-
-				const appliedShapes: ShapeRecord[] = [];
-				const now = Date.now();
-				const maxAllowedTime = now + 5000; // Allow max 5s clock skew
-
-				try {
-					this.ctx.storage.transactionSync(() => {
-						for (const s of payload.shapes) {
-							if (!s || typeof s.id !== 'string' || !s.id || !VALID_SHAPE_TYPES.has(s.type)) {
-								continue;
-							}
-							const safeUpdatedAt =
-								typeof s.updatedAt === 'number' && Number.isFinite(s.updatedAt) && s.updatedAt > 0
-									? Math.min(s.updatedAt, maxAllowedTime)
-									: now;
-
-							let dataStr: string | null = null;
-							if (s.data !== undefined) {
-								try {
-									dataStr = JSON.stringify(s.data);
-								} catch {
-									dataStr = null;
-								}
-							}
-
-							this.ctx.storage.sql.exec(
-								upsertStmt,
-								s.id,
-								s.type,
-								Number.isFinite(s.x) ? s.x : 0.0,
-								Number.isFinite(s.y) ? s.y : 0.0,
-								Number.isFinite(s.width) ? s.width : 0.0,
-								Number.isFinite(s.height) ? s.height : 0.0,
-								typeof s.fill === 'string' ? s.fill : 'transparent',
-								typeof s.stroke === 'string' ? s.stroke : '#000000',
-								Number.isFinite(s.strokeWidth) ? s.strokeWidth : 2.0,
-								Number.isFinite(s.rotation) ? s.rotation : 0.0,
-								Number.isInteger(s.zIndex) ? s.zIndex : 0,
-								dataStr,
-								senderUserId,
-								safeUpdatedAt
-							);
-
-							// Read back the committed shape to confirm LWW won
-							const updatedRow = this.ctx.storage.sql
-								.exec<RawShapeRow>(
-									'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes WHERE id = ?',
-									s.id
-								)
-								.one();
-
-							if (updatedRow && updatedRow.updated_at === safeUpdatedAt) {
-								appliedShapes.push(this.rowToShape(updatedRow));
-							}
-						}
-					});
-				} catch (err) {
-					console.error('Failed to commit shape:upsert transaction:', err);
-					return;
-				}
-
-				if (appliedShapes.length > 0) {
-					const broadcastMsg: S2CMessage = {
-						type: 'shapes:upserted',
-						shapes: appliedShapes
-					};
-					this.broadcast(JSON.stringify(broadcastMsg));
-				}
+			case 'shape:upsert':
+				this.handleShapeUpsert(ws, payload);
 				break;
-			}
-
-			case 'shape:delete': {
-				if (!payload.ids || !Array.isArray(payload.ids) || payload.ids.length === 0) {
-					return;
-				}
-
-				if (this.hasPassword() && !this.isAuthed(ws)) {
-					return;
-				}
-
-				const validIds = payload.ids.filter((id) => typeof id === 'string' && id.length > 0);
-				if (validIds.length === 0) return;
-
-				try {
-					this.ctx.storage.transactionSync(() => {
-						for (const id of validIds) {
-							this.ctx.storage.sql.exec('DELETE FROM shapes WHERE id = ?', id);
-						}
-					});
-				} catch (err) {
-					console.error('Failed to delete shapes:', err);
-					return;
-				}
-
-				const broadcastMsg: S2CMessage = {
-					type: 'shapes:deleted',
-					ids: validIds
-				};
-				this.broadcast(JSON.stringify(broadcastMsg));
+			case 'shape:delete':
+				this.handleShapeDelete(ws, payload);
 				break;
-			}
-
-			case 'canvas:clear': {
-				if (this.hasPassword() && !this.isAuthed(ws)) {
-					return;
-				}
-
-				try {
-					this.ctx.storage.sql.exec('DELETE FROM shapes');
-				} catch (err) {
-					console.error('Failed to clear canvas:', err);
-					return;
-				}
-
-				const broadcastMsg: S2CMessage = {
-					type: 'canvas:cleared'
-				};
-				this.broadcast(JSON.stringify(broadcastMsg));
+			case 'canvas:clear':
+				this.handleCanvasClear(ws);
 				break;
-			}
 		}
+	}
+
+	private async handleAuth(
+		ws: WebSocket,
+		payload: Extract<C2SMessage, { type: 'room:auth' }>
+	): Promise<void> {
+		if (!this.hasPassword()) {
+			this.markAuthed(ws);
+			this.authFailures.delete(ws);
+			ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
+			this.sendFullSync(ws);
+			return;
+		}
+
+		const failState = this.authFailures.get(ws);
+		if (failState && Date.now() < failState.lockedUntil) {
+			ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
+			return;
+		}
+
+		const ok = await this.verifyPassword(payload.password ?? '');
+		if (ok) {
+			this.authFailures.delete(ws);
+			this.markAuthed(ws);
+			ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
+			this.sendFullSync(ws);
+		} else {
+			const count = (failState?.failures ?? 0) + 1;
+			if (count >= 10) {
+				ws.close(1008, 'Too many failed authentication attempts');
+				this.cleanupSocket(ws);
+				return;
+			} else if (count >= 5) {
+				this.authFailures.set(ws, { failures: count, lockedUntil: Date.now() + 5000 });
+			} else {
+				this.authFailures.set(ws, { failures: count, lockedUntil: 0 });
+			}
+			ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
+		}
+	}
+
+	private async handleSetPassword(
+		ws: WebSocket,
+		payload: Extract<C2SMessage, { type: 'room:set_password' }>
+	): Promise<void> {
+		const pw = payload.password ?? '';
+		if (pw.length < MIN_PASSWORD_LENGTH || pw.length > MAX_PASSWORD_LENGTH) {
+			return;
+		}
+		if (this.hasPassword() && !this.isAuthed(ws)) {
+			return;
+		}
+		await this.setPassword(pw);
+		this.markAuthed(ws);
+		ws.send(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage));
+		this.broadcast(JSON.stringify({ type: 'room:password_set' } satisfies S2CMessage), ws, false);
+		this.sendFullSync(ws);
+	}
+
+	private handlePresence(
+		ws: WebSocket,
+		payload: Extract<C2SMessage, { type: 'presence:update' }>
+	): void {
+		if (this.hasPassword() && !this.isAuthed(ws)) {
+			return;
+		}
+		const attachment: PeerAttachment = {
+			userId: payload.userId,
+			name: payload.name,
+			color: payload.color,
+			cursor: payload.cursor,
+			selectedIds: payload.selectedIds,
+			authed: this.isAuthed(ws)
+		};
+		ws.serializeAttachment(attachment);
+
+		const presenceMsg: S2CMessage = {
+			type: 'presence:peer',
+			userId: payload.userId,
+			name: payload.name,
+			color: payload.color,
+			cursor: payload.cursor,
+			selectedIds: payload.selectedIds
+		};
+		this.broadcast(JSON.stringify(presenceMsg), ws);
+	}
+
+	private handleShapeUpsert(
+		ws: WebSocket,
+		payload: Extract<C2SMessage, { type: 'shape:upsert' }>
+	): void {
+		if (!payload.shapes || !Array.isArray(payload.shapes) || payload.shapes.length === 0) {
+			return;
+		}
+
+		if (this.hasPassword() && !this.isAuthed(ws)) {
+			return;
+		}
+
+		const existingCountRow = this.ctx.storage.sql
+			.exec<{ count: number }>('SELECT COUNT(*) as count FROM shapes')
+			.one();
+		const currentCount = existingCountRow?.count ?? 0;
+
+		if (currentCount >= 10000) {
+			return;
+		}
+
+		const senderAttachment = ws.deserializeAttachment() as PeerAttachment | null;
+		const senderUserId = senderAttachment?.userId ?? 'anonymous';
+
+		const upsertStmt = `
+			INSERT INTO shapes (
+				id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT(id) DO UPDATE SET
+				x = excluded.x,
+				y = excluded.y,
+				width = excluded.width,
+				height = excluded.height,
+				fill = excluded.fill,
+				stroke = excluded.stroke,
+				stroke_width = excluded.stroke_width,
+				rotation = excluded.rotation,
+				z_index = excluded.z_index,
+				data = excluded.data,
+				updated_at = excluded.updated_at
+			WHERE excluded.updated_at >= shapes.updated_at;
+		`;
+
+		const appliedShapes: ShapeRecord[] = [];
+		const now = Date.now();
+		const maxAllowedTime = now + 5000;
+
+		try {
+			this.ctx.storage.transactionSync(() => {
+				for (const s of payload.shapes) {
+					if (!s || typeof s.id !== 'string' || !s.id || !VALID_SHAPE_TYPES.has(s.type)) {
+						continue;
+					}
+					const safeUpdatedAt =
+						typeof s.updatedAt === 'number' && Number.isFinite(s.updatedAt) && s.updatedAt > 0
+							? Math.min(s.updatedAt, maxAllowedTime)
+							: now;
+
+					let dataStr: string | null = null;
+					if (s.data !== undefined) {
+						try {
+							dataStr = JSON.stringify(s.data);
+						} catch {
+							dataStr = null;
+						}
+					}
+
+					this.ctx.storage.sql.exec(
+						upsertStmt,
+						s.id,
+						s.type,
+						Number.isFinite(s.x) ? s.x : 0.0,
+						Number.isFinite(s.y) ? s.y : 0.0,
+						Number.isFinite(s.width) ? s.width : 0.0,
+						Number.isFinite(s.height) ? s.height : 0.0,
+						typeof s.fill === 'string' ? s.fill : 'transparent',
+						typeof s.stroke === 'string' ? s.stroke : '#000000',
+						Number.isFinite(s.strokeWidth) ? s.strokeWidth : 2.0,
+						Number.isFinite(s.rotation) ? s.rotation : 0.0,
+						Number.isInteger(s.zIndex) ? s.zIndex : 0,
+						dataStr,
+						senderUserId,
+						safeUpdatedAt
+					);
+
+					const updatedRow = this.ctx.storage.sql
+						.exec<RawShapeRow>(
+							'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes WHERE id = ?',
+							s.id
+						)
+						.one();
+
+					if (updatedRow && updatedRow.updated_at === safeUpdatedAt) {
+						appliedShapes.push(this.rowToShape(updatedRow));
+					}
+				}
+			});
+		} catch (err) {
+			console.error('Failed to commit shape:upsert transaction:', err);
+			return;
+		}
+
+		if (appliedShapes.length > 0) {
+			const broadcastMsg: S2CMessage = {
+				type: 'shapes:upserted',
+				shapes: appliedShapes
+			};
+			this.broadcast(JSON.stringify(broadcastMsg));
+		}
+	}
+
+	private handleShapeDelete(
+		ws: WebSocket,
+		payload: Extract<C2SMessage, { type: 'shape:delete' }>
+	): void {
+		if (!payload.ids || !Array.isArray(payload.ids) || payload.ids.length === 0) {
+			return;
+		}
+
+		if (this.hasPassword() && !this.isAuthed(ws)) {
+			return;
+		}
+
+		const validIds = payload.ids.filter((id) => typeof id === 'string' && id.length > 0);
+		if (validIds.length === 0) return;
+
+		try {
+			this.ctx.storage.transactionSync(() => {
+				for (const id of validIds) {
+					this.ctx.storage.sql.exec('DELETE FROM shapes WHERE id = ?', id);
+				}
+			});
+		} catch (err) {
+			console.error('Failed to delete shapes:', err);
+			return;
+		}
+
+		const broadcastMsg: S2CMessage = {
+			type: 'shapes:deleted',
+			ids: validIds
+		};
+		this.broadcast(JSON.stringify(broadcastMsg));
+	}
+
+	private handleCanvasClear(ws: WebSocket): void {
+		if (this.hasPassword() && !this.isAuthed(ws)) {
+			return;
+		}
+
+		try {
+			this.ctx.storage.sql.exec('DELETE FROM shapes');
+		} catch (err) {
+			console.error('Failed to clear canvas:', err);
+			return;
+		}
+
+		const broadcastMsg: S2CMessage = {
+			type: 'canvas:cleared'
+		};
+		this.broadcast(JSON.stringify(broadcastMsg));
 	}
 
 	async webSocketClose(
