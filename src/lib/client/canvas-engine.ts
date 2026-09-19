@@ -9,16 +9,24 @@ import {
 } from './canvas-text';
 import {
 	drawActiveStroke,
+	drawAlignmentGuides,
 	drawAnchorIndicator,
 	drawArrowHead,
 	drawLinePreview,
 	drawMarqueeBox,
 	drawPeerCursor,
+	drawQuickAddButtons,
 	drawSelectionOutline,
 	drawShape,
 	drawShapePreview,
 	renderGrid
 } from './canvas-render';
+import {
+	calculateOrthogonalPath,
+	getQuickAddButtons,
+	getShapeAnchors,
+	type AnchorSide
+} from './math';
 import {
 	exportToPng,
 	exportToSvg,
@@ -211,9 +219,12 @@ export class CanvasEngine implements InteractionHost {
 	onStrokeWidthChanged?: (width: number) => void;
 	onFontFamilyChanged?: (family: string) => void;
 	onFontSizeChanged?: (size: number) => void;
+	onArrowRoutingChanged?: (routing: 'straight' | 'orthogonal') => void;
 	onTextShapeStyleChanged?: (shape: ShapeRecord) => void;
 	onStartTextEdit?: (shape: ShapeRecord) => void;
 	onEndTextEdit?: () => void;
+
+	arrowRouting: 'straight' | 'orthogonal' = 'orthogonal';
 
 	private toolChangedListeners: ((tool: ToolMode) => void)[] = [];
 	private selectionListeners: ((selectedIds: string[]) => void)[] = [];
@@ -482,6 +493,92 @@ export class CanvasEngine implements InteractionHost {
 		this.strokeWidth = width;
 		this.applyPropertyToSelection({ strokeWidth: width });
 		this.onStrokeWidthChanged?.(width);
+	}
+
+	setArrowRouting(routing: 'straight' | 'orthogonal') {
+		this.arrowRouting = routing;
+		this.onArrowRoutingChanged?.(routing);
+
+		if (this.selectedIds.length > 0) {
+			const modified: ShapeRecord[] = [];
+			const before: ShapeRecord[] = [];
+			const now = Date.now();
+
+			for (const id of this.selectedIds) {
+				const shape = this.shapes.get(id);
+				if (shape && shape.type === 'path' && shape.data?.isArrow) {
+					before.push({ ...shape, data: { ...shape.data } });
+					let points = shape.data.points ? [...shape.data.points] : [];
+					const startAnchor = shape.data.startAnchor;
+					const endAnchor = shape.data.endAnchor;
+
+					if (startAnchor && endAnchor) {
+						const startShape = this.shapes.get(startAnchor.shapeId);
+						const endShape = this.shapes.get(endAnchor.shapeId);
+						if (startShape && endShape) {
+							const startAnchors = getShapeAnchors(startShape);
+							const endAnchors = getShapeAnchors(endShape);
+							const sA = startAnchors.find((a) => a.side === startAnchor.side);
+							const eA = endAnchors.find((a) => a.side === endAnchor.side);
+							if (sA && eA) {
+								if (routing === 'orthogonal') {
+									points = calculateOrthogonalPath(sA, eA, sA.side, eA.side);
+								} else {
+									points = [
+										{ x: sA.x, y: sA.y },
+										{ x: eA.x, y: eA.y }
+									];
+								}
+							}
+						}
+					} else if (points.length >= 2) {
+						if (routing === 'orthogonal') {
+							points = calculateOrthogonalPath(points[0], points[points.length - 1]);
+						} else {
+							points = [points[0], points[points.length - 1]];
+						}
+					}
+
+					let minX = Infinity;
+					let minY = Infinity;
+					let maxX = -Infinity;
+					let maxY = -Infinity;
+					for (const p of points) {
+						if (p.x < minX) minX = p.x;
+						if (p.y < minY) minY = p.y;
+						if (p.x > maxX) maxX = p.x;
+						if (p.y > maxY) maxY = p.y;
+					}
+
+					const updated: ShapeRecord = {
+						...shape,
+						x: minX !== Infinity ? minX : shape.x,
+						y: minY !== Infinity ? minY : shape.y,
+						width: maxX !== -Infinity ? Math.max(maxX - minX, 10) : shape.width,
+						height: maxY !== -Infinity ? Math.max(maxY - minY, 10) : shape.height,
+						data: {
+							...shape.data,
+							routing,
+							points
+						},
+						updatedAt: now
+					};
+					this.shapes.set(id, updated);
+					modified.push(updated);
+				}
+			}
+
+			if (modified.length > 0) {
+				this.onShapesMutated?.(modified);
+				this.onActionRecorded?.({
+					type: 'modify',
+					before,
+					after: modified
+				});
+				this.renderBuffer();
+				this.renderOverlay();
+			}
+		}
 	}
 
 	calculateTextBounds(
@@ -786,6 +883,164 @@ export class CanvasEngine implements InteractionHost {
 		this.renderOverlay();
 
 		return newShapes;
+	}
+
+	insertBatchShapes(shapes: ShapeRecord[]) {
+		if (!shapes || shapes.length === 0) return;
+		for (const s of shapes) {
+			this.shapes.set(s.id, s);
+		}
+		this.onShapesMutated?.(shapes);
+		this.onActionRecorded?.({
+			type: 'batch_create',
+			shapes
+		});
+		this.setSelectedIds(shapes.map((s) => s.id));
+		this.renderBuffer();
+		this.renderOverlay();
+	}
+
+	quickAddConnectedNode(sourceShapeId: string, side: AnchorSide): ShapeRecord | null {
+		const sourceShape = this.shapes.get(sourceShapeId);
+		if (!sourceShape) return null;
+
+		const spacing = 120;
+		const width = sourceShape.width || 120;
+		const height = sourceShape.height || 60;
+		let newX = sourceShape.x;
+		let newY = sourceShape.y;
+		let oppositeSide: AnchorSide = 'left';
+
+		if (side === 'right') {
+			newX = sourceShape.x + sourceShape.width + spacing;
+			newY = sourceShape.y + (sourceShape.height - height) / 2;
+			oppositeSide = 'left';
+		} else if (side === 'left') {
+			newX = sourceShape.x - width - spacing;
+			newY = sourceShape.y + (sourceShape.height - height) / 2;
+			oppositeSide = 'right';
+		} else if (side === 'bottom') {
+			newX = sourceShape.x + (sourceShape.width - width) / 2;
+			newY = sourceShape.y + sourceShape.height + spacing;
+			oppositeSide = 'top';
+		} else if (side === 'top') {
+			newX = sourceShape.x + (sourceShape.width - width) / 2;
+			newY = sourceShape.y - height - spacing;
+			oppositeSide = 'bottom';
+		}
+
+		const newId = generateShapeId();
+		const now = Date.now();
+		const nextZ = this.getNextZIndex();
+
+		const isDiamond = sourceShape.type === 'path' && sourceShape.data?.isDiamond;
+		let newShapeData: Record<string, unknown> = {};
+		if (isDiamond) {
+			const points: PathPoint[] = [
+				{ x: newX + width / 2, y: newY },
+				{ x: newX + width, y: newY + height / 2 },
+				{ x: newX + width / 2, y: newY + height },
+				{ x: newX, y: newY + height / 2 },
+				{ x: newX + width / 2, y: newY }
+			];
+			newShapeData = { isDiamond: true, points, text: '' };
+		} else if (sourceShape.type === 'sticky_note') {
+			newShapeData = { text: '' };
+		}
+
+		const newShape: ShapeRecord = {
+			id: newId,
+			type: sourceShape.type,
+			x: Math.round(newX),
+			y: Math.round(newY),
+			width,
+			height,
+			fill: sourceShape.fill,
+			stroke: sourceShape.stroke || this.strokeColor,
+			strokeWidth: sourceShape.strokeWidth || this.strokeWidth,
+			rotation: 0,
+			zIndex: nextZ,
+			data: newShapeData,
+			createdBy: '',
+			updatedAt: now
+		};
+
+		// Create connecting arrow
+		const sourceAnchors = getShapeAnchors(sourceShape);
+		const targetAnchors = getShapeAnchors(newShape);
+		const startAnchor = sourceAnchors.find((a) => a.side === side) || {
+			x: sourceShape.x + sourceShape.width,
+			y: sourceShape.y + sourceShape.height / 2,
+			side
+		};
+		const endAnchor = targetAnchors.find((a) => a.side === oppositeSide) || {
+			x: newShape.x,
+			y: newShape.y + newShape.height / 2,
+			side: oppositeSide
+		};
+
+		let arrowPoints: PathPoint[];
+		if (this.arrowRouting === 'orthogonal') {
+			arrowPoints = calculateOrthogonalPath(startAnchor, endAnchor, side, oppositeSide);
+		} else {
+			arrowPoints = [
+				{ x: startAnchor.x, y: startAnchor.y },
+				{ x: endAnchor.x, y: endAnchor.y }
+			];
+		}
+
+		let minX = Infinity;
+		let minY = Infinity;
+		let maxX = -Infinity;
+		let maxY = -Infinity;
+		for (const p of arrowPoints) {
+			if (p.x < minX) minX = p.x;
+			if (p.y < minY) minY = p.y;
+			if (p.x > maxX) maxX = p.x;
+			if (p.y > maxY) maxY = p.y;
+		}
+
+		const arrowId = generateShapeId();
+		const arrowShape: ShapeRecord = {
+			id: arrowId,
+			type: 'path',
+			x: minX !== Infinity ? minX : newX,
+			y: minY !== Infinity ? minY : newY,
+			width: maxX !== -Infinity ? Math.max(maxX - minX, 10) : 10,
+			height: maxY !== -Infinity ? Math.max(maxY - minY, 10) : 10,
+			fill: 'transparent',
+			stroke: this.strokeColor,
+			strokeWidth: 2,
+			rotation: 0,
+			zIndex: nextZ + 1,
+			data: {
+				points: arrowPoints,
+				isArrow: true,
+				routing: this.arrowRouting,
+				startAnchor: { shapeId: sourceShape.id, side },
+				endAnchor: { shapeId: newShape.id, side: oppositeSide }
+			},
+			createdBy: '',
+			updatedAt: now + 1
+		};
+
+		this.shapes.set(newShape.id, newShape);
+		this.shapes.set(arrowShape.id, arrowShape);
+
+		const created = [newShape, arrowShape];
+		this.onShapesMutated?.(created);
+		this.onActionRecorded?.({
+			type: 'batch_create',
+			shapes: created
+		});
+
+		this.setSelectedIds([newShape.id]);
+		this.renderBuffer();
+		this.renderOverlay();
+
+		this.startTextEdit(newShape);
+
+		return newShape;
 	}
 
 	pastePlainText(text: string): ShapeRecord | null {
@@ -1200,6 +1455,8 @@ export class CanvasEngine implements InteractionHost {
 		if (interactionType === 'draw' && activePathPoints.length > 1) {
 			drawActiveStroke(ctx, activePathPoints, this.strokeColor, this.strokeWidth);
 		} else if (interactionType === 'create_line') {
+			const startAnchor = this.interactions.getActiveStartAnchor();
+			const hoverAnchor = this.interactions.getActiveHoverAnchor();
 			drawLinePreview(
 				ctx,
 				startPoint,
@@ -1207,7 +1464,10 @@ export class CanvasEngine implements InteractionHost {
 				this.strokeColor,
 				this.strokeWidth,
 				this.tool === 'arrow',
-				this.isShiftPressed
+				this.isShiftPressed,
+				this.arrowRouting,
+				startAnchor?.side,
+				hoverAnchor?.side
 			);
 		} else if (interactionType === 'create_shape') {
 			drawShapePreview(
@@ -1223,6 +1483,11 @@ export class CanvasEngine implements InteractionHost {
 			drawMarqueeBox(ctx, startPoint, currentPoint, this.viewport.zoom);
 		}
 
+		const guides = this.interactions.getActiveGuides();
+		if (guides && guides.length > 0) {
+			drawAlignmentGuides(ctx, guides, this.viewport.zoom);
+		}
+
 		const hoverAnchor = this.interactions.getActiveHoverAnchor();
 		if (hoverAnchor) {
 			drawAnchorIndicator(ctx, hoverAnchor, this.viewport.zoom);
@@ -1235,6 +1500,26 @@ export class CanvasEngine implements InteractionHost {
 			this.viewport.zoom,
 			this.editingShapeId
 		);
+
+		if (
+			this.tool === 'select' &&
+			this.selectedIds.length === 1 &&
+			!this.editingShapeId &&
+			!this.interactions.isInteracting
+		) {
+			const selectedShape = this.shapes.get(this.selectedIds[0]);
+			if (
+				selectedShape &&
+				(selectedShape.type === 'rectangle' ||
+					selectedShape.type === 'ellipse' ||
+					selectedShape.type === 'sticky_note' ||
+					(selectedShape.type === 'path' && selectedShape.data?.isDiamond))
+			) {
+				const buttons = getQuickAddButtons(selectedShape);
+				const hoveredSide = this.interactions.getHoveredQuickAddSide();
+				drawQuickAddButtons(ctx, buttons, this.viewport.zoom, hoveredSide);
+			}
+		}
 
 		for (const peer of this.peers) {
 			const smooth = this.smoothCursors.get(peer.userId);

@@ -10,6 +10,7 @@
 		onUndo?: () => void;
 		onRedo?: () => void;
 		onClearCanvas: () => void;
+		onOpenMermaid?: () => void;
 	}
 
 	let {
@@ -19,7 +20,8 @@
 		canRedo = false,
 		onUndo,
 		onRedo,
-		onClearCanvas
+		onClearCanvas,
+		onOpenMermaid
 	}: Props = $props();
 
 	let activeTool = $state<ToolMode>('select');
@@ -27,6 +29,7 @@
 	let activeWidth = $state<number>(2);
 	let activeFontFamily = $state<string>('sans');
 	let activeFontSize = $state<number>(18);
+	let activeArrowRouting = $state<'straight' | 'orthogonal'>('orthogonal');
 	let isTextShapeSelected = $state<boolean>(false);
 
 	const FONT_FAMILY_OPTIONS = [
@@ -67,6 +70,7 @@
 			activeWidth = engine.strokeWidth;
 			activeFontFamily = engine.fontFamily;
 			activeFontSize = engine.fontSize;
+			activeArrowRouting = engine.arrowRouting;
 			updateSelectedState();
 
 			engine.onToolChanged = (tool) => {
@@ -85,6 +89,9 @@
 			engine.onFontSizeChanged = (size) => {
 				activeFontSize = size;
 			};
+			engine.onArrowRoutingChanged = (routing) => {
+				activeArrowRouting = routing;
+			};
 			const unsub = engine.addSelectionListener(() => {
 				updateSelectedState();
 			});
@@ -93,6 +100,15 @@
 	});
 
 	const isTextActive = $derived(activeTool === 'text' || isTextShapeSelected);
+
+	const isArrowActive = $derived.by(() => {
+		if (activeTool === 'arrow' || activeTool === 'line') return true;
+		if (!engine || selectedCount === 0) return false;
+		return engine.selectedIds.some((id) => {
+			const s = engine.getShape(id);
+			return s && s.type === 'path' && s.data?.isArrow;
+		});
+	});
 
 	const hasNonTextSelected = $derived.by(() => {
 		if (!engine || selectedCount === 0) return false;
@@ -151,6 +167,11 @@
 	function setFontSize(size: number) {
 		activeFontSize = size;
 		engine?.setFontSize(size);
+	}
+
+	function setArrowRouting(routing: 'straight' | 'orthogonal') {
+		activeArrowRouting = routing;
+		engine?.setArrowRouting(routing);
 	}
 
 	function handleDelete() {
@@ -453,6 +474,55 @@
 			</div>
 		{/if}
 
+		<!-- Arrow Routing Selector (Straight vs Elbow) -->
+		{#if isArrowActive}
+			<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
+			<div class="flex items-center gap-1">
+				<button
+					onclick={() => setArrowRouting('orthogonal')}
+					class="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeArrowRouting ===
+					'orthogonal'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+					title="Elbow / Orthogonal (90° step arrow)"
+					aria-label="Elbow arrow routing"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M5 19h7a4 4 0 0 0 4-4V5" />
+						<polyline points="12 9 16 5 20 9" />
+					</svg>
+					<span class="hidden sm:inline">Elbow</span>
+				</button>
+				<button
+					onclick={() => setArrowRouting('straight')}
+					class="flex items-center gap-1 rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeArrowRouting ===
+					'straight'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+					title="Straight line arrow"
+					aria-label="Straight arrow routing"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<line x1="5" y1="19" x2="19" y2="5" />
+						<polyline points="10 5 19 5 19 14" />
+					</svg>
+					<span class="hidden sm:inline">Straight</span>
+				</button>
+			</div>
+		{/if}
+
 		<!-- Font Family and Font Size Selector -->
 		{#if isTextActive}
 			<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
@@ -604,6 +674,31 @@
 
 	<div class="mx-0.5 h-5 w-px shrink-0 bg-(--surface-2)"></div>
 
+	<!-- Text to Diagram (Mermaid) Button -->
+	<button
+		onclick={onOpenMermaid}
+		class="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+		title="Text to Diagram / Mermaid (M)"
+		aria-label="Text to Diagram"
+	>
+		<svg
+			class="h-3.5 w-3.5 text-indigo-400"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+		>
+			<rect x="3" y="3" width="6" height="6" rx="1" />
+			<rect x="15" y="3" width="6" height="6" rx="1" />
+			<rect x="9" y="15" width="6" height="6" rx="1" />
+			<path d="M6 9v3a3 3 0 0 0 3 3h3" />
+			<path d="M18 9v3a3 3 0 0 1-3 3h-3" />
+		</svg>
+		<span class="hidden sm:inline">Diagram</span>
+	</button>
+
+	<div class="mx-0.5 h-5 w-px shrink-0 bg-(--surface-2)"></div>
+
 	<!-- Hidden File Input for JSON Import -->
 	<input
 		bind:this={fileInputRef}
@@ -679,6 +774,26 @@
 				<div class="px-2 py-1 text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
 					Import
 				</div>
+				<button
+					onclick={() => {
+						showExportMenu = false;
+						onOpenMermaid?.();
+					}}
+					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+				>
+					<svg
+						class="h-3.5 w-3.5 text-indigo-400"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<polygon points="12 2 2 7 12 12 22 7 12 2" />
+						<polyline points="2 17 12 22 22 17" />
+						<polyline points="2 12 12 17 22 12" />
+					</svg>
+					<span>Mermaid Diagram...</span>
+				</button>
 				<button
 					onclick={triggerImport}
 					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
