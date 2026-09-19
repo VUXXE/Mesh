@@ -145,7 +145,7 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 		return false;
 	}
 
-	if (shape.type === 'rectangle' || shape.type === 'text' || shape.type === 'sticky_note') {
+	if (shape.type === 'text' || shape.type === 'sticky_note') {
 		return (
 			point.x >= shape.x - hitPadding &&
 			point.x <= shape.x + shape.width + hitPadding &&
@@ -154,15 +154,66 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 		);
 	}
 
+	if (shape.type === 'rectangle') {
+		const isFilled = shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none';
+		if (isFilled) {
+			return (
+				point.x >= shape.x - hitPadding &&
+				point.x <= shape.x + shape.width + hitPadding &&
+				point.y >= shape.y - hitPadding &&
+				point.y <= shape.y + shape.height + hitPadding
+			);
+		} else {
+			const outerMinX = shape.x - hitPadding;
+			const outerMaxX = shape.x + shape.width + hitPadding;
+			const outerMinY = shape.y - hitPadding;
+			const outerMaxY = shape.y + shape.height + hitPadding;
+
+			const inOuter =
+				point.x >= outerMinX &&
+				point.x <= outerMaxX &&
+				point.y >= outerMinY &&
+				point.y <= outerMaxY;
+
+			if (!inOuter) return false;
+			if (shape.width <= hitPadding * 2 || shape.height <= hitPadding * 2) return true;
+
+			const innerMinX = shape.x + hitPadding;
+			const innerMaxX = shape.x + shape.width - hitPadding;
+			const innerMinY = shape.y + hitPadding;
+			const innerMaxY = shape.y + shape.height - hitPadding;
+
+			const inInner =
+				point.x > innerMinX && point.x < innerMaxX && point.y > innerMinY && point.y < innerMaxY;
+
+			return !inInner;
+		}
+	}
+
 	if (shape.type === 'ellipse') {
 		const rx = shape.width / 2;
 		const ry = shape.height / 2;
 		if (rx === 0 || ry === 0) return false;
 		const cx = shape.x + rx;
 		const cy = shape.y + ry;
+
+		const isFilled = shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none';
 		const normalizedX = (point.x - cx) / (rx + hitPadding);
 		const normalizedY = (point.y - cy) / (ry + hitPadding);
-		return normalizedX * normalizedX + normalizedY * normalizedY <= 1;
+		const inOuter = normalizedX * normalizedX + normalizedY * normalizedY <= 1;
+
+		if (!inOuter) return false;
+		if (isFilled || rx <= hitPadding || ry <= hitPadding) return true;
+
+		const innerRx = Math.max(rx - hitPadding, 0);
+		const innerRy = Math.max(ry - hitPadding, 0);
+		if (innerRx === 0 || innerRy === 0) return true;
+
+		const normInnerX = (point.x - cx) / innerRx;
+		const normInnerY = (point.y - cy) / innerRy;
+		const inInner = normInnerX * normInnerX + normInnerY * normInnerY < 1;
+
+		return !inInner;
 	}
 
 	if (shape.type === 'path') {
@@ -181,17 +232,91 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 	return false;
 }
 
+function ccw(
+	a: { x: number; y: number },
+	b: { x: number; y: number },
+	c: { x: number; y: number }
+): boolean {
+	return (c.y - a.y) * (b.x - a.x) > (b.y - a.y) * (c.x - a.x);
+}
+
+function segmentsIntersect(
+	p1: { x: number; y: number },
+	p2: { x: number; y: number },
+	p3: { x: number; y: number },
+	p4: { x: number; y: number }
+): boolean {
+	return ccw(p1, p3, p4) !== ccw(p2, p3, p4) && ccw(p1, p2, p3) !== ccw(p1, p2, p4);
+}
+
+function segmentIntersectsBox(
+	p1: { x: number; y: number },
+	p2: { x: number; y: number },
+	box: BoundingBox
+): boolean {
+	if (
+		(p1.x >= box.minX && p1.x <= box.maxX && p1.y >= box.minY && p1.y <= box.maxY) ||
+		(p2.x >= box.minX && p2.x <= box.maxX && p2.y >= box.minY && p2.y <= box.maxY)
+	) {
+		return true;
+	}
+	const tl = { x: box.minX, y: box.minY };
+	const tr = { x: box.maxX, y: box.minY };
+	const br = { x: box.maxX, y: box.maxY };
+	const bl = { x: box.minX, y: box.maxY };
+
+	return (
+		segmentsIntersect(p1, p2, tl, tr) ||
+		segmentsIntersect(p1, p2, tr, br) ||
+		segmentsIntersect(p1, p2, br, bl) ||
+		segmentsIntersect(p1, p2, bl, tl)
+	);
+}
+
 /**
- * Checks if a shape is inside a marquee selection box.
+ * Checks if a shape intersects with or is inside a marquee selection box.
  */
 export function isShapeInsideMarquee(shape: ShapeRecord, marquee: BoundingBox): boolean {
 	const b = getShapeBounds(shape);
-	return (
-		b.minX >= marquee.minX &&
-		b.maxX <= marquee.maxX &&
-		b.minY >= marquee.minY &&
-		b.maxY <= marquee.maxY
-	);
+
+	const aabbOverlap =
+		b.minX <= marquee.maxX &&
+		b.maxX >= marquee.minX &&
+		b.minY <= marquee.maxY &&
+		b.maxY >= marquee.minY;
+
+	if (!aabbOverlap) {
+		return false;
+	}
+
+	if (shape.type === 'path') {
+		const points: PathPoint[] = shape.data?.points ?? [];
+		if (points.length <= 1) {
+			return aabbOverlap;
+		}
+
+		for (let i = 0; i < points.length; i++) {
+			const p = points[i];
+			if (
+				p.x >= marquee.minX &&
+				p.x <= marquee.maxX &&
+				p.y >= marquee.minY &&
+				p.y <= marquee.maxY
+			) {
+				return true;
+			}
+		}
+
+		for (let i = 0; i < points.length - 1; i++) {
+			if (segmentIntersectsBox(points[i], points[i + 1], marquee)) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	return true;
 }
 
 /**

@@ -77,6 +77,7 @@ export class InteractionController {
 	private resizeInitialShape: ShapeRecord | null = null;
 	private dragInitialPositions = new Map<string, { x: number; y: number }>();
 	private dragInitialShapes = new Map<string, ShapeRecord>();
+	private marqueeInitialSelected: string[] = [];
 
 	constructor(private host: InteractionHost) {}
 
@@ -269,6 +270,9 @@ export class InteractionController {
 			} else {
 				if (!e.shiftKey) {
 					this.host.setSelectedIds([]);
+					this.marqueeInitialSelected = [];
+				} else {
+					this.marqueeInitialSelected = [...this.host.selectedIds];
 				}
 				this.interactionType = 'marquee';
 			}
@@ -451,14 +455,18 @@ export class InteractionController {
 				height: maxY - minY
 			};
 
-			const insideIds: string[] = [];
-			for (const shape of this.host.getShapes().values()) {
-				if (isShapeInsideMarquee(shape, marquee)) {
-					insideIds.push(shape.id);
+			if (marquee.width >= 3 || marquee.height >= 3) {
+				const hitIds = new Set(this.marqueeInitialSelected);
+				for (const shape of this.host.getShapes().values()) {
+					if (isShapeInsideMarquee(shape, marquee)) {
+						hitIds.add(shape.id);
+					}
 				}
+				this.host.setSelectedIds(Array.from(hitIds));
+			} else {
+				this.host.setSelectedIds(this.marqueeInitialSelected);
 			}
 
-			this.host.setSelectedIds(insideIds);
 			this.host.renderOverlay();
 		}
 	}
@@ -672,6 +680,7 @@ export class InteractionController {
 
 		this.isInteracting = false;
 		this.interactionType = null;
+		this.marqueeInitialSelected = [];
 		this.host.renderBuffer();
 		this.host.renderOverlay();
 	}
