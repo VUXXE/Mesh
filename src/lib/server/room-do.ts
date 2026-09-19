@@ -26,6 +26,11 @@ interface PeerAttachment {
 	cursor: { x: number; y: number } | null;
 	selectedIds: string[];
 	authed: boolean;
+	connectedAt: number;
+	rateLimitCount?: number;
+	rateLimitResetAt?: number;
+	authFailures?: number;
+	authLockedUntil?: number;
 }
 
 const MIN_PASSWORD_LENGTH = 4;
@@ -33,8 +38,8 @@ const MAX_PASSWORD_LENGTH = 128;
 const VALID_SHAPE_TYPES = new Set(['path', 'rectangle', 'ellipse', 'text', 'sticky_note']);
 
 export class WhiteboardRoom extends DurableObject {
-	private rateLimits = new Map<WebSocket, { count: number; resetAt: number }>();
-	private authFailures = new Map<WebSocket, { failures: number; lockedUntil: number }>();
+	private metaCache = new Map<string, string | null>();
+	private cachedShapeCount: number | null = null;
 
 	constructor(ctx: DurableObjectState, env: Env) {
 		super(ctx, env);
@@ -78,18 +83,15 @@ export class WhiteboardRoom extends DurableObject {
 		const passwordSet = this.hasPassword();
 
 		if (activeSockets.length >= 50) {
-			// If room is locked and full, prune an unauthenticated socket to let authenticating users connect
-			if (passwordSet) {
-				const unauthedSocket = activeSockets.find((s) => !this.isAuthed(s));
-				if (unauthedSocket) {
-					try {
-						unauthedSocket.close(4001, 'Evicted for incoming connection');
-						this.cleanupSocket(unauthedSocket);
-					} catch {
-						// Socket may already be closed
-					}
-					activeSockets = this.ctx.getWebSockets();
+			// If room is full, prune an unauthenticated socket to let authenticating users connect
+			const unauthedSocket = activeSockets.find((s) => !this.isAuthed(s));
+			if (unauthedSocket) {
+				try {
+					unauthedSocket.close(4001, 'Evicted for incoming connection');
+				} catch {
+					// Socket may already be closed
 				}
+				activeSockets = this.ctx.getWebSockets();
 			}
 			if (activeSockets.length >= 50) {
 				return new Response('Room full (max 50 users)', { status: 503 });
@@ -101,6 +103,22 @@ export class WhiteboardRoom extends DurableObject {
 
 		this.ctx.acceptWebSocket(server);
 
+		const now = Date.now();
+		const initialAttachment: PeerAttachment = {
+			userId: '',
+			name: '',
+			color: '',
+			cursor: null,
+			selectedIds: [],
+			authed: !passwordSet,
+			connectedAt: now,
+			rateLimitCount: 0,
+			rateLimitResetAt: now + 1000,
+			authFailures: 0,
+			authLockedUntil: 0
+		};
+		server.serializeAttachment(initialAttachment);
+
 		const url = new URL(request.url);
 		const roomIdMatch = url.pathname.match(/\/api\/room\/([^/]+)\/ws/);
 		const roomId = roomIdMatch ? roomIdMatch[1] : 'unknown';
@@ -111,27 +129,13 @@ export class WhiteboardRoom extends DurableObject {
 		const initMsg: S2CMessage = {
 			type: 'sync:init',
 			roomId,
-			serverTime: Date.now(),
+			serverTime: now,
 			shapes,
 			peers,
 			requiresPassword: passwordSet ? true : undefined
 		};
 
 		server.send(JSON.stringify(initMsg));
-
-		// Impose a 15-second auth timeout on newly connected sockets in password-protected rooms
-		if (passwordSet) {
-			setTimeout(() => {
-				try {
-					if (!this.isAuthed(server)) {
-						server.close(4001, 'Authentication timeout');
-						this.cleanupSocket(server);
-					}
-				} catch {
-					// Socket might already be closed
-				}
-			}, 15000);
-		}
 
 		return new Response(null, {
 			status: 101,
@@ -140,6 +144,14 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
+		const att = this.getAttachment(ws);
+
+		// If room requires password, reject/close unauthenticated sockets exceeding 15 seconds
+		if (this.hasPassword() && !att.authed && Date.now() - att.connectedAt > 15000) {
+			ws.close(4001, 'Authentication timeout');
+			return;
+		}
+
 		// Reject frames exceeding 64KB (PRD §2, §9.2)
 		const byteLength =
 			typeof message === 'string'
@@ -147,24 +159,22 @@ export class WhiteboardRoom extends DurableObject {
 				: message.byteLength;
 		if (byteLength > 65536) {
 			ws.close(1009, 'Frame size exceeds 64KB');
-			this.rateLimits.delete(ws);
 			return;
 		}
 
 		// Sliding-window rate limiting: max 150 msg/sec (PRD §9.3)
 		const now = Date.now();
-		let rl = this.rateLimits.get(ws);
-		if (!rl || now >= rl.resetAt) {
-			rl = { count: 1, resetAt: now + 1000 };
-			this.rateLimits.set(ws, rl);
+		if (!att.rateLimitResetAt || now >= att.rateLimitResetAt) {
+			att.rateLimitCount = 1;
+			att.rateLimitResetAt = now + 1000;
 		} else {
-			rl.count++;
-			if (rl.count > 150) {
+			att.rateLimitCount = (att.rateLimitCount ?? 0) + 1;
+			if (att.rateLimitCount > 150) {
 				ws.close(1008, 'Rate limit exceeded (150 msg/s)');
-				this.rateLimits.delete(ws);
 				return;
 			}
 		}
+		ws.serializeAttachment(att);
 
 		let rawText: string;
 		if (typeof message === 'string') {
@@ -206,37 +216,39 @@ export class WhiteboardRoom extends DurableObject {
 		ws: WebSocket,
 		payload: Extract<C2SMessage, { type: 'room:auth' }>
 	): Promise<void> {
+		const att = this.getAttachment(ws);
 		if (!this.hasPassword()) {
 			this.markAuthed(ws);
-			this.authFailures.delete(ws);
 			ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
 			this.sendFullSync(ws);
 			return;
 		}
 
-		const failState = this.authFailures.get(ws);
-		if (failState && Date.now() < failState.lockedUntil) {
+		if (att.authLockedUntil && Date.now() < att.authLockedUntil) {
 			ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
 			return;
 		}
 
 		const ok = await this.verifyPassword(payload.password ?? '');
 		if (ok) {
-			this.authFailures.delete(ws);
-			this.markAuthed(ws);
+			att.authFailures = 0;
+			att.authLockedUntil = 0;
+			att.authed = true;
+			ws.serializeAttachment(att);
 			ws.send(JSON.stringify({ type: 'room:auth_ok' } satisfies S2CMessage));
 			this.sendFullSync(ws);
 		} else {
-			const count = (failState?.failures ?? 0) + 1;
+			const count = (att.authFailures ?? 0) + 1;
+			att.authFailures = count;
 			if (count >= 10) {
 				ws.close(1008, 'Too many failed authentication attempts');
-				this.cleanupSocket(ws);
 				return;
 			} else if (count >= 5) {
-				this.authFailures.set(ws, { failures: count, lockedUntil: Date.now() + 5000 });
+				att.authLockedUntil = Date.now() + 5000;
 			} else {
-				this.authFailures.set(ws, { failures: count, lockedUntil: 0 });
+				att.authLockedUntil = 0;
 			}
+			ws.serializeAttachment(att);
 			ws.send(JSON.stringify({ type: 'room:auth_failed' } satisfies S2CMessage));
 		}
 	}
@@ -266,14 +278,12 @@ export class WhiteboardRoom extends DurableObject {
 		if (this.hasPassword() && !this.isAuthed(ws)) {
 			return;
 		}
-		const attachment: PeerAttachment = {
-			userId: payload.userId,
-			name: payload.name,
-			color: payload.color,
-			cursor: payload.cursor,
-			selectedIds: payload.selectedIds,
-			authed: this.isAuthed(ws)
-		};
+		const attachment = this.getAttachment(ws);
+		attachment.userId = payload.userId;
+		attachment.name = payload.name;
+		attachment.color = payload.color;
+		attachment.cursor = payload.cursor;
+		attachment.selectedIds = payload.selectedIds;
 		ws.serializeAttachment(attachment);
 
 		const presenceMsg: S2CMessage = {
@@ -285,6 +295,16 @@ export class WhiteboardRoom extends DurableObject {
 			selectedIds: payload.selectedIds
 		};
 		this.broadcast(JSON.stringify(presenceMsg), ws);
+	}
+
+	private getShapeCount(): number {
+		if (this.cachedShapeCount === null) {
+			const row = this.ctx.storage.sql
+				.exec<{ count: number }>('SELECT COUNT(*) as count FROM shapes')
+				.one();
+			this.cachedShapeCount = row?.count ?? 0;
+		}
+		return this.cachedShapeCount;
 	}
 
 	private handleShapeUpsert(
@@ -299,12 +319,7 @@ export class WhiteboardRoom extends DurableObject {
 			return;
 		}
 
-		const existingCountRow = this.ctx.storage.sql
-			.exec<{ count: number }>('SELECT COUNT(*) as count FROM shapes')
-			.one();
-		const currentCount = existingCountRow?.count ?? 0;
-
-		if (currentCount >= 10000) {
+		if (this.getShapeCount() >= 10000) {
 			return;
 		}
 
@@ -327,7 +342,8 @@ export class WhiteboardRoom extends DurableObject {
 				z_index = excluded.z_index,
 				data = excluded.data,
 				updated_at = excluded.updated_at
-			WHERE excluded.updated_at >= shapes.updated_at;
+			WHERE excluded.updated_at >= shapes.updated_at
+			RETURNING id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at;
 		`;
 
 		const appliedShapes: ShapeRecord[] = [];
@@ -354,28 +370,23 @@ export class WhiteboardRoom extends DurableObject {
 						}
 					}
 
-					this.ctx.storage.sql.exec(
-						upsertStmt,
-						s.id,
-						s.type,
-						Number.isFinite(s.x) ? s.x : 0.0,
-						Number.isFinite(s.y) ? s.y : 0.0,
-						Number.isFinite(s.width) ? s.width : 0.0,
-						Number.isFinite(s.height) ? s.height : 0.0,
-						typeof s.fill === 'string' ? s.fill : 'transparent',
-						typeof s.stroke === 'string' ? s.stroke : '#000000',
-						Number.isFinite(s.strokeWidth) ? s.strokeWidth : 2.0,
-						Number.isFinite(s.rotation) ? s.rotation : 0.0,
-						Number.isInteger(s.zIndex) ? s.zIndex : 0,
-						dataStr,
-						senderUserId,
-						safeUpdatedAt
-					);
-
 					const updatedRow = this.ctx.storage.sql
 						.exec<RawShapeRow>(
-							'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes WHERE id = ?',
-							s.id
+							upsertStmt,
+							s.id,
+							s.type,
+							Number.isFinite(s.x) ? s.x : 0.0,
+							Number.isFinite(s.y) ? s.y : 0.0,
+							Number.isFinite(s.width) ? s.width : 0.0,
+							Number.isFinite(s.height) ? s.height : 0.0,
+							typeof s.fill === 'string' ? s.fill : 'transparent',
+							typeof s.stroke === 'string' ? s.stroke : '#000000',
+							Number.isFinite(s.strokeWidth) ? s.strokeWidth : 2.0,
+							Number.isFinite(s.rotation) ? s.rotation : 0.0,
+							Number.isInteger(s.zIndex) ? s.zIndex : 0,
+							dataStr,
+							senderUserId,
+							safeUpdatedAt
 						)
 						.one();
 
@@ -390,6 +401,7 @@ export class WhiteboardRoom extends DurableObject {
 		}
 
 		if (appliedShapes.length > 0) {
+			this.cachedShapeCount = null;
 			const broadcastMsg: S2CMessage = {
 				type: 'shapes:upserted',
 				shapes: appliedShapes
@@ -415,8 +427,10 @@ export class WhiteboardRoom extends DurableObject {
 
 		try {
 			this.ctx.storage.transactionSync(() => {
-				for (const id of validIds) {
-					this.ctx.storage.sql.exec('DELETE FROM shapes WHERE id = ?', id);
+				const placeholders = validIds.map(() => '?').join(',');
+				this.ctx.storage.sql.exec(`DELETE FROM shapes WHERE id IN (${placeholders})`, ...validIds);
+				if (this.cachedShapeCount !== null) {
+					this.cachedShapeCount = Math.max(0, this.cachedShapeCount - validIds.length);
 				}
 			});
 		} catch (err) {
@@ -438,6 +452,7 @@ export class WhiteboardRoom extends DurableObject {
 
 		try {
 			this.ctx.storage.sql.exec('DELETE FROM shapes');
+			this.cachedShapeCount = 0;
 		} catch (err) {
 			console.error('Failed to clear canvas:', err);
 			return;
@@ -476,18 +491,23 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	private cleanupSocket(ws: WebSocket): void {
-		this.rateLimits.delete(ws);
-		this.authFailures.delete(ws);
+		// State lives on WebSocket attachment
 	}
 
 	private getMeta(key: string): string | null {
+		if (this.metaCache.has(key)) {
+			return this.metaCache.get(key) ?? null;
+		}
 		const rows = this.ctx.storage.sql
 			.exec<{ value: string }>('SELECT value FROM room_meta WHERE key = ?', key)
 			.toArray();
-		return rows[0]?.value ?? null;
+		const val = rows[0]?.value ?? null;
+		this.metaCache.set(key, val);
+		return val;
 	}
 
 	private setMeta(key: string, value: string): void {
+		this.metaCache.set(key, value);
 		this.ctx.storage.sql.exec(
 			'INSERT INTO room_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
 			key,
@@ -505,16 +525,31 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	private markAuthed(ws: WebSocket): void {
-		const att = (ws.deserializeAttachment() as PeerAttachment | null) ?? {
+		const att = this.getAttachment(ws);
+		att.authed = true;
+		att.authFailures = 0;
+		att.authLockedUntil = 0;
+		ws.serializeAttachment(att);
+	}
+
+	private getAttachment(ws: WebSocket): PeerAttachment {
+		const att = ws.deserializeAttachment() as PeerAttachment | null;
+		if (att) return att;
+		const fallback: PeerAttachment = {
 			userId: '',
 			name: '',
 			color: '',
 			cursor: null,
 			selectedIds: [],
-			authed: false
+			authed: !this.hasPassword(),
+			connectedAt: Date.now(),
+			rateLimitCount: 0,
+			rateLimitResetAt: Date.now() + 1000,
+			authFailures: 0,
+			authLockedUntil: 0
 		};
-		att.authed = true;
-		ws.serializeAttachment(att);
+		ws.serializeAttachment(fallback);
+		return fallback;
 	}
 
 	private async hashPassword(password: string, salt: string): Promise<string> {
