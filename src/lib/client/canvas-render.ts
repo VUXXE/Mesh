@@ -157,11 +157,20 @@ export function drawShape(
 	ctx.restore();
 }
 
-export function drawPeerCursor(ctx: CanvasRenderingContext2D, peer: PeerPresence) {
-	if (!peer.cursor) return;
+export function drawPeerCursor(
+	ctx: CanvasRenderingContext2D,
+	peer: PeerPresence,
+	overridePos?: { x: number; y: number } | null,
+	alpha = 1
+) {
+	const pos = overridePos ?? peer.cursor;
+	if (!pos || alpha <= 0.01) return;
 
 	ctx.save();
-	const { x, y } = peer.cursor;
+	if (alpha < 1) {
+		ctx.globalAlpha = Math.max(0, Math.min(1, alpha));
+	}
+	const { x, y } = pos;
 	const color = peer.color || '#06b6d4';
 
 	// SVG-style pointer arrow

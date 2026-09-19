@@ -67,6 +67,15 @@ export interface ViewportState {
 	zoom: number;
 }
 
+interface SmoothPeerCursor {
+	currentX: number;
+	currentY: number;
+	targetX: number;
+	targetY: number;
+	alpha: number;
+	targetAlpha: number;
+}
+
 export class CanvasEngine implements InteractionHost {
 	private staticCanvas: HTMLCanvasElement;
 	overlayCanvas: HTMLCanvasElement;
@@ -129,6 +138,9 @@ export class CanvasEngine implements InteractionHost {
 
 	private shapes: Map<string, ShapeRecord> = new Map();
 	private peers: PeerPresence[] = [];
+	private smoothCursors = new Map<string, SmoothPeerCursor>();
+	private cursorRafId: number | null = null;
+	private lastRafTimestamp = 0;
 
 	onShapesMutated?: (shapes: ShapeRecord[]) => void;
 	onShapesDeleted?: (ids: string[]) => void;
@@ -221,8 +233,114 @@ export class CanvasEngine implements InteractionHost {
 
 	setPeers(peers: PeerPresence[]) {
 		this.peers = peers;
+		const currentPeerIds = new Set(peers.map((p) => p.userId));
+
+		// Remove smooth cursors for peers who are no longer present
+		for (const [id] of this.smoothCursors) {
+			if (!currentPeerIds.has(id)) {
+				this.smoothCursors.delete(id);
+			}
+		}
+
+		let needsAnimation = false;
+
+		for (const peer of peers) {
+			let state = this.smoothCursors.get(peer.userId);
+			if (peer.cursor) {
+				if (!state) {
+					state = {
+						currentX: peer.cursor.x,
+						currentY: peer.cursor.y,
+						targetX: peer.cursor.x,
+						targetY: peer.cursor.y,
+						alpha: 1,
+						targetAlpha: 1
+					};
+					this.smoothCursors.set(peer.userId, state);
+				} else {
+					state.targetX = peer.cursor.x;
+					state.targetY = peer.cursor.y;
+					state.targetAlpha = 1;
+
+					// If jump is huge (> 1000px), snap immediately without lerp
+					const dist = Math.hypot(state.targetX - state.currentX, state.targetY - state.currentY);
+					if (dist > 1000) {
+						state.currentX = state.targetX;
+						state.currentY = state.targetY;
+					} else if (dist > 0.2 || state.alpha < 1) {
+						needsAnimation = true;
+					}
+				}
+			} else if (state) {
+				state.targetAlpha = 0;
+				if (state.alpha > 0.05) {
+					needsAnimation = true;
+				}
+			}
+		}
+
 		this.renderOverlay();
+
+		if (
+			needsAnimation &&
+			this.cursorRafId === null &&
+			typeof requestAnimationFrame !== 'undefined'
+		) {
+			this.lastRafTimestamp = performance.now();
+			this.cursorRafId = requestAnimationFrame(this.tickCursorInterpolation);
+		}
 	}
+
+	private tickCursorInterpolation = (timestamp: number) => {
+		const dt = Math.min((timestamp - this.lastRafTimestamp) / 1000, 0.1);
+		this.lastRafTimestamp = timestamp;
+
+		// Exponential smoothing factor: 1 - Math.exp(-decay * dt)
+		// decay = 25 gives a smooth, brisk response (~95% reached in 60-80ms matching network interval)
+		const posFactor = 1 - Math.exp(-25 * dt);
+		const alphaFactor = 1 - Math.exp(-15 * dt);
+
+		let hasActiveMotion = false;
+
+		for (const [userId, state] of this.smoothCursors) {
+			const dx = state.targetX - state.currentX;
+			const dy = state.targetY - state.currentY;
+			const dist = Math.hypot(dx, dy);
+
+			if (dist > 0.2) {
+				state.currentX += dx * posFactor;
+				state.currentY += dy * posFactor;
+				hasActiveMotion = true;
+			} else {
+				state.currentX = state.targetX;
+				state.currentY = state.targetY;
+			}
+
+			const dAlpha = state.targetAlpha - state.alpha;
+			if (Math.abs(dAlpha) > 0.02) {
+				state.alpha += dAlpha * alphaFactor;
+				hasActiveMotion = true;
+			} else {
+				state.alpha = state.targetAlpha;
+			}
+
+			if (state.targetAlpha === 0 && state.alpha <= 0.02) {
+				this.smoothCursors.delete(userId);
+			}
+		}
+
+		this.renderOverlay();
+
+		if (
+			hasActiveMotion &&
+			this.smoothCursors.size > 0 &&
+			typeof requestAnimationFrame !== 'undefined'
+		) {
+			this.cursorRafId = requestAnimationFrame(this.tickCursorInterpolation);
+		} else {
+			this.cursorRafId = null;
+		}
+	};
 
 	addToolChangedListener(fn: (tool: ToolMode) => void) {
 		this.toolChangedListeners.push(fn);
@@ -662,12 +780,23 @@ export class CanvasEngine implements InteractionHost {
 		);
 
 		for (const peer of this.peers) {
-			if (peer.cursor) {
-				drawPeerCursor(ctx, peer);
+			const smooth = this.smoothCursors.get(peer.userId);
+			if (smooth && smooth.alpha > 0.01) {
+				drawPeerCursor(ctx, peer, { x: smooth.currentX, y: smooth.currentY }, smooth.alpha);
+			} else if (peer.cursor) {
+				drawPeerCursor(ctx, peer, peer.cursor, 1);
 			}
 		}
 
 		ctx.restore();
+	}
+
+	destroy() {
+		if (this.cursorRafId !== null && typeof cancelAnimationFrame !== 'undefined') {
+			cancelAnimationFrame(this.cursorRafId);
+			this.cursorRafId = null;
+		}
+		this.smoothCursors.clear();
 	}
 
 	triggerBrowserDownload(source: string | Blob, filename: string) {
