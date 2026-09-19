@@ -10,6 +10,7 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/VUXXE/Mesh/releases/tag/v1.0.0"><img src="https://img.shields.io/badge/Release-v1.0.0-blue?style=flat-square&logo=github" alt="Release v1.0.0" /></a>
   <a href="#key-features"><img src="https://img.shields.io/badge/Svelte-5%20Runes-ff3e00?style=flat-square&logo=svelte&logoColor=white" alt="Svelte 5" /></a>
   <a href="#key-features"><img src="https://img.shields.io/badge/Runtime-Cloudflare%20Workers-f38020?style=flat-square&logo=cloudflare&logoColor=white" alt="Cloudflare Workers" /></a>
   <a href="#architecture--storage"><img src="https://img.shields.io/badge/Storage-Embedded%20SQLite-003b57?style=flat-square&logo=sqlite&logoColor=white" alt="SQLite" /></a>
@@ -22,13 +23,14 @@
 
 ## Highlights
 
-- **Edge-Native & Serverless:** Front-end SSR, static assets, and backend Durable Objects live under the exact same Cloudflare Worker origin. No reverse proxy, zero CORS issues.
-- **Embedded SQLite Persistence:** Each room is powered by its own dedicated `WhiteboardRoom` Durable Object with transactional SQLite storage and monotonic Last-Write-Wins (LWW) conflict resolution.
-- **WebSocket Hibernation API:** Zero idle compute billing. Connections hibernate in memory at the edge until packets arrive.
+- **Edge-Native & Zero-Worker SPA:** Canvas pages load as a static SPA via Cloudflare Assets at 0 Worker invocations. WebSocket upgrades and dynamic routing execute directly on the same origin without reverse proxies or CORS.
+- **Embedded SQLite Persistence:** Each room is powered by a dedicated `WhiteboardRoom` Durable Object with transactional SQLite storage and monotonic Last-Write-Wins (LWW) conflict resolution.
+- **WebSocket Deep Hibernation:** Zero background timers or sleep locks. Socket connections hibernate in edge memory with state preserved in socket attachments until packets arrive.
+- **Client-Side Cursor LERP Interpolation:** 60–120fps peer cursor rendering on an interactive overlay using exponential smoothing ($1 - e^{-25 \times \Delta t}$), while keeping network presence broadcasts throttled to 80ms (~12.5Hz).
 - **Dual-Layer Canvas Architecture:**
   - _Committed Static Buffer:_ Re-rendered only upon shape mutations or viewport transformations.
-  - _60fps Interactive Overlay:_ Renders active drawing previews, selection handles, and live peer cursor movements smoothly without redrawing the entire scene.
-- **Self-Hostable Anywhere:** Deploy to Cloudflare Workers with one command, or self-host in any environment using Docker and Docker Compose. Zero external database dependencies.
+  - _Interactive Overlay:_ Renders active drawing previews, selection handles, and interpolated peer cursor positions without redrawing static canvas elements.
+- **Self-Hostable Anywhere:** Deploy to Cloudflare Workers with one command, or run via Docker and Docker Compose with embedded SQLite persistence. Zero external database dependencies.
 
 ---
 
@@ -74,12 +76,14 @@ Open [http://localhost:4173](http://localhost:4173) in your browser. Open an Inc
 
 ### 👥 Real-Time Collaboration & Presence
 
-- **Adaptive Ephemeral Cursors:** Remote pointer positions broadcast at an adaptive 15Hz (~66ms) with smooth client-side interpolation.
-- **Solo Room Silence:** When alone in a room, continuous cursor streaming is suppressed, dropping solo presence overhead from 108,000 requests/hour down to zero and keeping usage safely within Cloudflare Free Tier quotas.
-- **Deadband Filtering:** Sub-2px micro-movements and resting cursor states are skipped to eliminate network jitter.
-- **Background Inactivity Pause:** Switching to another browser tab (`document.visibilityState === 'hidden'`) automatically hides your cursor and suspends presence broadcasts until returning.
+- **Client-Side LERP Interpolation:** Remote peer cursors run an exponential smoothing loop ($1 - e^{-25 \times \Delta t}$) via `requestAnimationFrame` on the interactive overlay layer, delivering 60–120fps motion from 80ms network packets.
+- **Adaptive Ephemeral Broadcasting:** Cursor coordinates broadcast at 80ms (~12.5Hz) only when active peers share the room.
+- **Coordinate Quantization:** Coordinates are rounded to 1 decimal place before transmission, cutting presence JSON payload size by ~46%.
+- **Solo Room Silence:** When alone in a room, continuous cursor streaming is suppressed, dropping idle presence traffic to zero.
+- **Deadband Filtering:** Sub-2px micro-movements and resting cursor states are skipped to eliminate redundant network frames.
+- **Tab Visibility & Disconnect Fade:** Hidden tabs (`visibilitychange`) suspend broadcasts and hide cursors. Disconnected peers fade out smoothly over 200ms rather than vanishing abruptly.
 - **Custom Identity:** Live user avatars with customizable display names and signature colors saved in local storage.
-- **Zero-Storage Presence:** Cursor coordinates and selection packets are routed exclusively in memory and never touch disk.
+- **Zero-Storage Presence:** Cursor coordinates and selection packets are routed exclusively in memory and never touch SQLite.
 
 ### ⏪ Multi-Level History (Undo / Redo)
 
@@ -119,27 +123,28 @@ flowchart TD
         SQLite[("Embedded SQLite DB")]
         MemStore["Ephemeral In-Memory Presence"]
 
-        Origin -->|HTTP / SSR| UI
+        Origin -->|Static Assets / SPA Shell| UI
         Socket <-->|WebSocket 101| DO
-        DO <-->|LWW Monotonic Upsert| SQLite
-        DO <-->|30Hz Broadcast| MemStore
+        DO <-->|Atomic LWW Upsert| SQLite
+        DO <-->|12.5Hz Ephemeral Broadcast| MemStore
     end
 ```
 
 ### Modular Architecture
 
 - **Client Canvas Subsystems:**
-  - **`CanvasEngine`** ([`canvas-engine.ts`](src/lib/client/canvas-engine.ts)): Lean coordinator managing viewport transforms, dual-buffer invalidation, state synchronization, and undo/redo history.
+  - **`CanvasEngine`** ([`canvas-engine.ts`](src/lib/client/canvas-engine.ts)): Lean coordinator managing viewport transforms, dual-buffer invalidation, state synchronization, undo/redo history, and 60–120fps LERP cursor animation.
   - **`InteractionController`** ([`canvas-interactions.ts`](src/lib/client/canvas-interactions.ts)): Pointer and multi-touch gestures (pinch-zoom, two-finger pan), shape translation, 8-handle resize transformations, and marquee selection.
-  - **`CanvasRender`** ([`canvas-render.ts`](src/lib/client/canvas-render.ts)): Pure rendering functions for all shape primitives, bounding boxes, resize handles, and 60fps drawing previews.
+  - **`CanvasRender`** ([`canvas-render.ts`](src/lib/client/canvas-render.ts)): Pure rendering functions for all shape primitives, bounding boxes, resize handles, smooth cursor interpolation, and 60fps drawing previews.
   - **`CanvasExport`** ([`canvas-export.ts`](src/lib/client/canvas-export.ts)): High-res PNG rendering, pure vector SVG generation, and JSON room backup/restore.
   - **`CanvasText`** ([`canvas-text.ts`](src/lib/client/canvas-text.ts)): Typography metrics, bounding box measurement, and multi-line wrapping.
-- **Edge Durable Object Subsystem:**
-  - **`WhiteboardRoom`** ([`room-do.ts`](src/lib/server/room-do.ts)): Single-origin room DO handling WebSocket hibernation, PBKDF2 room authentication, monotonic LWW SQLite transactions, and in-memory presence broadcasting.
+- **Edge Routing & Storage Subsystems:**
+  - **`Zero-Worker SPA Shell`** ([`+layout.ts`](src/routes/+layout.ts)): Static SPA delivery via Cloudflare Assets CDN at 0 Worker compute cost, with `hooks.server.ts` upgrading WebSocket connections directly to room stubs.
+  - **`WhiteboardRoom`** ([`room-do.ts`](src/lib/server/room-do.ts)): Single-origin room DO handling WebSocket deep hibernation, lazy PBKDF2 authentication, atomic `RETURNING *` SQLite transactions, and in-memory presence broadcasting.
 
 ### Monotonic LWW Concurrency
 
-Conflict resolution operates strictly under monotonic Last-Write-Wins (LWW):
+Conflict resolution operates strictly under monotonic Last-Write-Wins (LWW) with atomic return clauses that eliminate redundant `SELECT` queries:
 
 ```sql
 INSERT INTO shapes (id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at)
@@ -157,7 +162,8 @@ ON CONFLICT(id) DO UPDATE SET
     z_index = excluded.z_index,
     data = excluded.data,
     updated_at = excluded.updated_at
-WHERE excluded.updated_at >= shapes.updated_at;
+WHERE excluded.updated_at >= shapes.updated_at
+RETURNING id, updated_at;
 ```
 
 ---
@@ -269,6 +275,8 @@ bun run scripts/test-room-link-parser.ts
 bun run scripts/test-history.ts
 bun run scripts/test-export-import.ts
 bun run scripts/test-presence-quota.ts
+bun run scripts/test-worker-efficiency.ts
+bun run scripts/test-cursor-interpolation.ts
 
 # Run live integration tests (local edge server on :8788 required)
 bun run scripts/test-handshake.ts
@@ -313,7 +321,7 @@ All WebSocket messages are encoded as JSON strings over standard secure WebSocke
 
 ### Client to Server (C2S)
 
-- `presence:update`: Broadcasts local cursor coordinates `(x, y)` and selected shape IDs with adaptive 15Hz throttling.
+- `presence:update`: Broadcasts local cursor coordinates `(x, y)` and selected shape IDs with adaptive 80ms (~12.5Hz) throttling.
 - `room:auth`: Submits a room password for authentication.
 - `room:set_password`: Sets (or, when authed, changes) the room password.
 - `shape:upsert`: Sends an array of created or modified `shapes[]` with millisecond timestamps.
