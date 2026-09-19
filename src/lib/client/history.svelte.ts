@@ -2,6 +2,7 @@ import type { ShapeRecord } from '../types';
 
 export type HistoryAction =
 	| { type: 'create'; shape: ShapeRecord }
+	| { type: 'batch_create'; shapes: ShapeRecord[] }
 	| { type: 'modify'; before: ShapeRecord[]; after: ShapeRecord[] }
 	| { type: 'delete'; shapes: ShapeRecord[] }
 	| { type: 'clear'; shapes: ShapeRecord[] };
@@ -41,6 +42,9 @@ export class HistoryManager {
 		switch (action.type) {
 			case 'create':
 				deleteFn([action.shape.id]);
+				break;
+			case 'batch_create':
+				deleteFn(action.shapes.map((s) => s.id));
 				break;
 			case 'modify':
 				upsertFn(
@@ -84,6 +88,14 @@ export class HistoryManager {
 		switch (action.type) {
 			case 'create':
 				upsertFn([{ ...action.shape, updatedAt: now }]);
+				break;
+			case 'batch_create':
+				upsertFn(
+					action.shapes.map((s, idx) => ({
+						...s,
+						updatedAt: now + idx
+					}))
+				);
 				break;
 			case 'modify':
 				upsertFn(

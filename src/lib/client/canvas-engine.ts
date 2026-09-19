@@ -1,4 +1,4 @@
-import type { PeerPresence, ShapeRecord } from '../types';
+import type { PathPoint, PeerPresence, ShapeRecord } from '../types';
 import type { HistoryAction } from './history.svelte';
 import {
 	FONT_FAMILIES,
@@ -76,6 +76,50 @@ interface SmoothPeerCursor {
 	targetAlpha: number;
 }
 
+export interface MeshClipboardPayload {
+	type: 'mesh/shapes';
+	version: number;
+	shapes: ShapeRecord[];
+}
+
+export function generateShapeId(): string {
+	if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+		return 'shape_' + crypto.randomUUID().replace(/-/g, '').slice(0, 12);
+	}
+	return 'shape_' + Math.random().toString(36).substring(2, 10);
+}
+
+export function cloneAndOffsetShape(
+	shape: ShapeRecord,
+	dx: number,
+	dy: number,
+	newId: string,
+	zIndex: number,
+	updatedAt: number
+): ShapeRecord {
+	const cloned: ShapeRecord = {
+		...shape,
+		id: newId,
+		x: shape.x + dx,
+		y: shape.y + dy,
+		zIndex,
+		updatedAt
+	};
+
+	if (shape.data) {
+		cloned.data = { ...shape.data };
+		if (shape.type === 'path' && Array.isArray(shape.data.points)) {
+			cloned.data.points = shape.data.points.map((p: PathPoint) => ({
+				...p,
+				x: p.x + dx,
+				y: p.y + dy
+			}));
+		}
+	}
+
+	return cloned;
+}
+
 export class CanvasEngine implements InteractionHost {
 	private staticCanvas: HTMLCanvasElement;
 	overlayCanvas: HTMLCanvasElement;
@@ -141,6 +185,8 @@ export class CanvasEngine implements InteractionHost {
 	private smoothCursors = new Map<string, SmoothPeerCursor>();
 	private cursorRafId: number | null = null;
 	private lastRafTimestamp = 0;
+	private clipboard: ShapeRecord[] = [];
+	private pasteCount = 0;
 
 	onShapesMutated?: (shapes: ShapeRecord[]) => void;
 	onShapesDeleted?: (ids: string[]) => void;
@@ -631,6 +677,7 @@ export class CanvasEngine implements InteractionHost {
 			const shape = this.shapes.get(id);
 			if (shape) {
 				shapesToDelete.push({ ...shape });
+				this.shapes.delete(id);
 			}
 		}
 
@@ -643,6 +690,353 @@ export class CanvasEngine implements InteractionHost {
 				shapes: shapesToDelete
 			});
 		}
+		this.renderBuffer();
+		this.renderOverlay();
+	}
+
+	hasClipboard(): boolean {
+		return this.clipboard.length > 0;
+	}
+
+	getClipboard(): ShapeRecord[] {
+		return this.clipboard;
+	}
+
+	copySelected(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const selected = this.selectedIds
+			.map((id) => this.shapes.get(id))
+			.filter((s): s is ShapeRecord => Boolean(s));
+
+		if (selected.length === 0) return false;
+
+		this.clipboard = selected.map((s) => ({
+			...s,
+			data: s.data
+				? {
+						...s.data,
+						points:
+							s.type === 'path' && Array.isArray(s.data.points)
+								? s.data.points.map((p: PathPoint) => ({ ...p }))
+								: s.data.points
+					}
+				: undefined
+		}));
+		this.pasteCount = 0;
+
+		if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+			const payload: MeshClipboardPayload = {
+				type: 'mesh/shapes',
+				version: 1,
+				shapes: this.clipboard
+			};
+			navigator.clipboard.writeText(JSON.stringify(payload)).catch(() => {
+				// Ignore clipboard permissions or headless failure
+			});
+		}
+
+		return true;
+	}
+
+	cutSelected(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const ok = this.copySelected();
+		if (ok) {
+			this.deleteSelected();
+		}
+		return ok;
+	}
+
+	pasteShapes(shapesToPaste: ShapeRecord[], offsetMultiplier?: number): ShapeRecord[] {
+		if (!shapesToPaste || shapesToPaste.length === 0) return [];
+
+		const multiplier = offsetMultiplier ?? ++this.pasteCount;
+		const offset = multiplier * 20;
+		const now = Date.now();
+		const baseZ = this.getNextZIndex();
+
+		const newShapes: ShapeRecord[] = shapesToPaste.map((shape, idx) => {
+			const newId = generateShapeId();
+			return cloneAndOffsetShape(shape, offset, offset, newId, baseZ + idx, now + idx);
+		});
+
+		for (const s of newShapes) {
+			this.shapes.set(s.id, s);
+		}
+
+		this.onActionRecorded?.({
+			type: 'batch_create',
+			shapes: newShapes
+		});
+		this.onShapesMutated?.(newShapes);
+		this.setSelectedIds(newShapes.map((s) => s.id));
+		this.renderBuffer();
+		this.renderOverlay();
+
+		return newShapes;
+	}
+
+	async paste(): Promise<ShapeRecord[]> {
+		if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
+			try {
+				const text = await navigator.clipboard.readText();
+				if (text) {
+					const parsed = JSON.parse(text);
+					if (
+						parsed &&
+						parsed.type === 'mesh/shapes' &&
+						Array.isArray(parsed.shapes) &&
+						parsed.shapes.length > 0
+					) {
+						return this.pasteShapes(parsed.shapes);
+					}
+				}
+			} catch {
+				// Fall through to internal clipboard on read failure / rejection
+			}
+		}
+
+		if (this.clipboard.length > 0) {
+			return this.pasteShapes(this.clipboard);
+		}
+
+		return [];
+	}
+
+	duplicateSelected(): ShapeRecord[] {
+		if (this.selectedIds.length === 0) return [];
+		const selected = this.selectedIds
+			.map((id) => this.shapes.get(id))
+			.filter((s): s is ShapeRecord => Boolean(s));
+
+		if (selected.length === 0) return [];
+
+		const now = Date.now();
+		const baseZ = this.getNextZIndex();
+		const dx = 20;
+		const dy = 20;
+
+		const duplicated: ShapeRecord[] = selected.map((shape, idx) => {
+			const newId = generateShapeId();
+			return cloneAndOffsetShape(shape, dx, dy, newId, baseZ + idx, now + idx);
+		});
+
+		for (const s of duplicated) {
+			this.shapes.set(s.id, s);
+		}
+
+		this.onActionRecorded?.({
+			type: 'batch_create',
+			shapes: duplicated
+		});
+		this.onShapesMutated?.(duplicated);
+		this.setSelectedIds(duplicated.map((s) => s.id));
+		this.renderBuffer();
+		this.renderOverlay();
+
+		return duplicated;
+	}
+
+	selectAll() {
+		if (this.shapes.size === 0) return;
+		this.setSelectedIds(Array.from(this.shapes.keys()));
+		this.renderOverlay();
+	}
+
+	bringToFront(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const sortedAll = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
+		const selectedSet = new Set(this.selectedIds);
+		const nonSelected = sortedAll.filter((s) => !selectedSet.has(s.id));
+		if (nonSelected.length === 0) return false;
+
+		const highestNonSelectedZ = nonSelected[nonSelected.length - 1].zIndex;
+		const selectedShapes = sortedAll.filter((s) => selectedSet.has(s.id));
+
+		if (selectedShapes[0].zIndex > highestNonSelectedZ) {
+			return false;
+		}
+
+		const now = Date.now();
+		const before: ShapeRecord[] = [];
+		const after: ShapeRecord[] = [];
+
+		selectedShapes.forEach((s, idx) => {
+			before.push({ ...s });
+			const updated: ShapeRecord = {
+				...s,
+				zIndex: highestNonSelectedZ + 1 + idx,
+				updatedAt: now + idx
+			};
+			this.shapes.set(updated.id, updated);
+			after.push(updated);
+		});
+
+		this.onShapesMutated?.(after);
+		this.onActionRecorded?.({
+			type: 'modify',
+			before,
+			after
+		});
+		this.renderBuffer();
+		this.renderOverlay();
+		return true;
+	}
+
+	sendToBack(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const sortedAll = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
+		const selectedSet = new Set(this.selectedIds);
+		const nonSelected = sortedAll.filter((s) => !selectedSet.has(s.id));
+		if (nonSelected.length === 0) return false;
+
+		const lowestNonSelectedZ = nonSelected[0].zIndex;
+		const selectedShapes = sortedAll.filter((s) => selectedSet.has(s.id));
+
+		if (selectedShapes[selectedShapes.length - 1].zIndex < lowestNonSelectedZ) {
+			return false;
+		}
+
+		const now = Date.now();
+		const before: ShapeRecord[] = [];
+		const after: ShapeRecord[] = [];
+		const count = selectedShapes.length;
+
+		selectedShapes.forEach((s, idx) => {
+			before.push({ ...s });
+			const updated: ShapeRecord = {
+				...s,
+				zIndex: lowestNonSelectedZ - count + idx,
+				updatedAt: now + idx
+			};
+			this.shapes.set(updated.id, updated);
+			after.push(updated);
+		});
+
+		this.onShapesMutated?.(after);
+		this.onActionRecorded?.({
+			type: 'modify',
+			before,
+			after
+		});
+		this.renderBuffer();
+		this.renderOverlay();
+		return true;
+	}
+
+	bringForward(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
+		const selectedSet = new Set(this.selectedIds);
+
+		const originalIndices = new Map<string, number>();
+		const originalZMap = new Map<string, number>();
+		sorted.forEach((s, idx) => {
+			originalIndices.set(s.id, idx);
+			originalZMap.set(s.id, s.zIndex);
+		});
+
+		let swappedAny = false;
+		for (let i = sorted.length - 2; i >= 0; i--) {
+			if (selectedSet.has(sorted[i].id) && !selectedSet.has(sorted[i + 1].id)) {
+				const temp = sorted[i];
+				sorted[i] = sorted[i + 1];
+				sorted[i + 1] = temp;
+				swappedAny = true;
+			}
+		}
+
+		if (!swappedAny) return false;
+
+		return this.applyReorderedZIndices(sorted, originalIndices, originalZMap);
+	}
+
+	sendBackward(): boolean {
+		if (this.selectedIds.length === 0) return false;
+		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
+		const selectedSet = new Set(this.selectedIds);
+
+		const originalIndices = new Map<string, number>();
+		const originalZMap = new Map<string, number>();
+		sorted.forEach((s, idx) => {
+			originalIndices.set(s.id, idx);
+			originalZMap.set(s.id, s.zIndex);
+		});
+
+		let swappedAny = false;
+		for (let i = 1; i < sorted.length; i++) {
+			if (selectedSet.has(sorted[i].id) && !selectedSet.has(sorted[i - 1].id)) {
+				const temp = sorted[i];
+				sorted[i] = sorted[i - 1];
+				sorted[i - 1] = temp;
+				swappedAny = true;
+			}
+		}
+
+		if (!swappedAny) return false;
+
+		return this.applyReorderedZIndices(sorted, originalIndices, originalZMap);
+	}
+
+	private applyReorderedZIndices(
+		sorted: ShapeRecord[],
+		originalIndices: Map<string, number>,
+		originalZMap: Map<string, number>
+	): boolean {
+		const now = Date.now();
+		const before: ShapeRecord[] = [];
+		const after: ShapeRecord[] = [];
+
+		let i = 0;
+		while (i < sorted.length) {
+			if (originalIndices.get(sorted[i].id) !== i) {
+				const start = i;
+				while (i < sorted.length && originalIndices.get(sorted[i].id) !== i) {
+					i++;
+				}
+				const end = i - 1;
+
+				const blockShapes = sorted.slice(start, end + 1);
+				const zPool = blockShapes.map((s) => originalZMap.get(s.id)!).sort((a, b) => a - b);
+
+				for (let k = 1; k < zPool.length; k++) {
+					if (zPool[k] <= zPool[k - 1]) {
+						zPool[k] = zPool[k - 1] + 1;
+					}
+				}
+
+				blockShapes.forEach((s, idx) => {
+					const oldZ = originalZMap.get(s.id)!;
+					const newZ = zPool[idx];
+					if (oldZ !== newZ) {
+						before.push({ ...s, zIndex: oldZ });
+						const updated: ShapeRecord = {
+							...s,
+							zIndex: newZ,
+							updatedAt: now + before.length
+						};
+						this.shapes.set(updated.id, updated);
+						after.push(updated);
+					}
+				});
+			} else {
+				i++;
+			}
+		}
+
+		if (after.length > 0) {
+			this.onShapesMutated?.(after);
+			this.onActionRecorded?.({
+				type: 'modify',
+				before,
+				after
+			});
+			this.renderBuffer();
+			this.renderOverlay();
+			return true;
+		}
+
+		return false;
 	}
 
 	updateShape(shape: ShapeRecord) {

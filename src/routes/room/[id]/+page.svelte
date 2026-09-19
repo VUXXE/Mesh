@@ -29,11 +29,16 @@
 		const handleKeyDown = (e: KeyboardEvent) => {
 			// Don't capture when typing in text inputs or modals
 			const target = e.target as HTMLElement;
-			if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA')) {
+			if (
+				target &&
+				(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+			) {
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
+			const isMod = e.ctrlKey || e.metaKey;
+
+			if (isMod && (e.key === 'z' || e.key === 'Z')) {
 				e.preventDefault();
 				if (e.shiftKey) {
 					handleRedo();
@@ -43,40 +48,126 @@
 				return;
 			}
 
-			if ((e.ctrlKey || e.metaKey) && (e.key === 'y' || e.key === 'Y')) {
+			if (isMod && (e.key === 'y' || e.key === 'Y')) {
 				e.preventDefault();
 				handleRedo();
 				return;
 			}
 
-			if (e.key === 'v' || e.key === 'V') {
-				engine?.setTool('select');
-			} else if (e.key === 'p' || e.key === 'P') {
-				engine?.setTool('pen');
-			} else if (e.key === 'l' || e.key === 'L') {
-				engine?.setTool('line');
-			} else if (e.key === 'a' || e.key === 'A') {
-				engine?.setTool('arrow');
-			} else if (e.key === 'r' || e.key === 'R') {
-				engine?.setTool('rectangle');
-			} else if (e.key === 'e' || e.key === 'E') {
-				engine?.setTool('ellipse');
-			} else if (e.key === 't' || e.key === 'T') {
-				engine?.setTool('text');
-			} else if (e.key === 's' || e.key === 'S') {
-				engine?.setTool('sticky_note');
-			} else if (e.key === 'Delete' || e.key === 'Backspace') {
-				engine?.deleteSelected();
-			} else if (e.key === 'Escape') {
-				engine?.setTool('select');
-			} else if (e.key === 'Enter') {
-				if (selectedIds.length === 1) {
-					const shape = engine?.getShape(selectedIds[0]);
-					if (shape && (shape.type === 'sticky_note' || shape.type === 'text')) {
-						e.preventDefault();
-						engine?.startTextEdit(shape);
+			if (isMod && (e.key === 'c' || e.key === 'C')) {
+				e.preventDefault();
+				engine?.copySelected();
+				return;
+			}
+
+			if (isMod && (e.key === 'x' || e.key === 'X')) {
+				e.preventDefault();
+				engine?.cutSelected();
+				return;
+			}
+
+			if (isMod && (e.key === 'v' || e.key === 'V')) {
+				e.preventDefault();
+				engine?.paste();
+				return;
+			}
+
+			if (isMod && (e.key === 'd' || e.key === 'D')) {
+				e.preventDefault();
+				engine?.duplicateSelected();
+				return;
+			}
+
+			if (isMod && (e.key === 'a' || e.key === 'A')) {
+				e.preventDefault();
+				engine?.selectAll();
+				return;
+			}
+
+			if (isMod && e.key === ']') {
+				e.preventDefault();
+				engine?.bringToFront();
+				return;
+			}
+
+			if (isMod && e.key === '[') {
+				e.preventDefault();
+				engine?.sendToBack();
+				return;
+			}
+
+			if (!isMod && !e.altKey) {
+				if (e.key === ']') {
+					e.preventDefault();
+					engine?.bringForward();
+					return;
+				}
+				if (e.key === '[') {
+					e.preventDefault();
+					engine?.sendBackward();
+					return;
+				}
+				if (e.key === 'v' || e.key === 'V') {
+					engine?.setTool('select');
+				} else if (e.key === 'p' || e.key === 'P') {
+					engine?.setTool('pen');
+				} else if (e.key === 'l' || e.key === 'L') {
+					engine?.setTool('line');
+				} else if (e.key === 'a' || e.key === 'A') {
+					engine?.setTool('arrow');
+				} else if (e.key === 'r' || e.key === 'R') {
+					engine?.setTool('rectangle');
+				} else if (e.key === 'e' || e.key === 'E') {
+					engine?.setTool('ellipse');
+				} else if (e.key === 't' || e.key === 'T') {
+					engine?.setTool('text');
+				} else if (e.key === 's' || e.key === 'S') {
+					engine?.setTool('sticky_note');
+				} else if (e.key === 'Delete' || e.key === 'Backspace') {
+					engine?.deleteSelected();
+				} else if (e.key === 'Escape') {
+					engine?.setTool('select');
+				} else if (e.key === 'Enter') {
+					if (selectedIds.length === 1) {
+						const shape = engine?.getShape(selectedIds[0]);
+						if (shape && (shape.type === 'sticky_note' || shape.type === 'text')) {
+							e.preventDefault();
+							engine?.startTextEdit(shape);
+						}
 					}
 				}
+			}
+		};
+
+		const handlePaste = (e: ClipboardEvent) => {
+			const target = e.target as HTMLElement;
+			if (
+				target &&
+				(target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
+			) {
+				return;
+			}
+			const text = e.clipboardData?.getData('text/plain');
+			if (text) {
+				try {
+					const parsed = JSON.parse(text);
+					if (
+						parsed &&
+						parsed.type === 'mesh/shapes' &&
+						Array.isArray(parsed.shapes) &&
+						parsed.shapes.length > 0
+					) {
+						e.preventDefault();
+						engine?.pasteShapes(parsed.shapes);
+						return;
+					}
+				} catch {
+					// Not valid mesh JSON
+				}
+			}
+			if (engine?.hasClipboard()) {
+				e.preventDefault();
+				engine.pasteShapes(engine.getClipboard());
 			}
 		};
 
@@ -87,10 +178,12 @@
 		};
 
 		window.addEventListener('keydown', handleKeyDown);
+		window.addEventListener('paste', handlePaste);
 		document.addEventListener('visibilitychange', handleVisibilityChange);
 
 		return () => {
 			window.removeEventListener('keydown', handleKeyDown);
+			window.removeEventListener('paste', handlePaste);
 			document.removeEventListener('visibilitychange', handleVisibilityChange);
 			socket?.destroy();
 		};
