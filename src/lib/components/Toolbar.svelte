@@ -431,18 +431,18 @@
 	}
 </script>
 
-<!-- SIDE STYLING PANEL (Excalidraw-grade left sidebar) -->
+<!-- SIDE STYLING PANEL (Crisp, disciplined radius architecture) -->
 {#if showSidePanel}
 	{#if isPanelCollapsed}
 		<div class="fixed top-16 left-4 z-20 select-none">
 			<button
 				onclick={() => (isPanelCollapsed = false)}
-				class="group flex items-center gap-2 rounded-xl border border-(--surface-2) bg-(--surface-1)/95 px-3 py-2 text-xs font-medium text-(--ink-1) shadow-xl backdrop-blur-md transition-all hover:border-(--surface-3) hover:bg-(--surface-2)"
+				class="group flex items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1)/95 px-3 py-2 text-xs font-medium text-(--ink-1) shadow-xl backdrop-blur-md transition-all hover:border-(--surface-3) hover:bg-(--surface-2)"
 				title="Expand style panel"
 				aria-label="Expand style panel"
 			>
 				<span
-					class="flex h-5 w-5 items-center justify-center rounded-md bg-[#6366f1]/20 text-[#6366f1]"
+					class="flex h-5 w-5 items-center justify-center rounded bg-[#6366f1]/20 text-[#6366f1]"
 				>
 					<svg
 						class="h-3.5 w-3.5"
@@ -474,7 +474,7 @@
 		</div>
 	{:else}
 		<div
-			class="no-scrollbar fixed top-16 left-4 z-20 flex max-h-[calc(100vh-5.5rem)] w-64 flex-col gap-3 overflow-y-auto rounded-2xl border border-(--surface-2) bg-(--surface-1)/95 p-3.5 shadow-2xl backdrop-blur-md transition-all select-none"
+			class="no-scrollbar fixed top-16 left-4 z-20 flex max-h-[calc(100vh-5.5rem)] w-64 flex-col gap-3 overflow-y-auto rounded-lg border border-(--surface-2) bg-(--surface-1)/95 p-3.5 shadow-xl backdrop-blur-md transition-all select-none"
 		>
 			<!-- Sticky Header: Contextual Title + Collapse Chevron -->
 			<div
@@ -483,7 +483,7 @@
 				<div class="flex items-center gap-2">
 					{#if selectedCount > 0}
 						<span
-							class="flex h-5 items-center justify-center rounded-md bg-[#6366f1]/20 px-1.5 font-mono text-[10px] font-bold text-[#6366f1]"
+							class="flex h-5 items-center justify-center rounded bg-[#6366f1]/20 px-1.5 font-mono text-[10px] font-bold text-[#6366f1]"
 						>
 							{selectedCount}
 						</span>
@@ -492,7 +492,7 @@
 						</span>
 					{:else}
 						<span
-							class="flex h-5 w-5 items-center justify-center rounded-md bg-(--surface-2) text-xs text-[#6366f1]"
+							class="flex h-5 w-5 items-center justify-center rounded bg-(--surface-2) text-xs text-[#6366f1]"
 						>
 							{#if activeTool === 'rectangle'}
 								<svg
@@ -587,7 +587,7 @@
 				</div>
 				<button
 					onclick={() => (isPanelCollapsed = true)}
-					class="rounded-lg p-1 text-(--ink-3) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1)"
+					class="rounded p-1 text-(--ink-3) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1)"
 					title="Collapse panel"
 					aria-label="Collapse panel"
 				>
@@ -616,7 +616,7 @@
 					{#each STROKE_COLORS as c}
 						<button
 							onclick={() => setColor(c.value)}
-							class="group relative flex h-6 w-6 items-center justify-center rounded-lg border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeColor.toLowerCase() ===
+							class="group relative flex h-6 w-6 items-center justify-center rounded border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeColor.toLowerCase() ===
 							c.value.toLowerCase()
 								? 'scale-105 ring-2 ring-[#6366f1] ring-offset-2 ring-offset-(--surface-1)'
 								: ''}"
@@ -636,7 +636,7 @@
 
 					<!-- Custom Stroke Color Picker Button -->
 					<label
-						class="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-dashed border-(--surface-3) bg-(--surface-2)/40 transition-all focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1] hover:bg-(--surface-2)"
+						class="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded border border-dashed border-(--surface-3) bg-(--surface-2)/40 transition-all focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1] hover:bg-(--surface-2)"
 						title="Custom color (Hex / RGB / Eyedropper)"
 						aria-label="Custom stroke color"
 					>
@@ -663,7 +663,7 @@
 
 				{#if isCustomStrokeColor}
 					<div
-						class="mt-1 flex items-center justify-between rounded-lg border border-(--surface-2) bg-(--surface-0)/70 px-2 py-1"
+						class="mt-1 flex items-center justify-between rounded border border-(--surface-2) bg-(--surface-0)/70 px-2 py-1"
 					>
 						<div class="flex items-center gap-1.5">
 							<span
@@ -695,7 +695,7 @@
 						{#each FILL_COLORS as fc}
 							<button
 								onclick={() => setFillColor(fc.value)}
-								class="group relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-lg border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeFillColor.toLowerCase() ===
+								class="group relative flex h-6 w-6 items-center justify-center overflow-hidden rounded border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeFillColor.toLowerCase() ===
 								fc.value.toLowerCase()
 									? 'scale-105 ring-2 ring-[#6366f1] ring-offset-2 ring-offset-(--surface-1)'
 									: ''} {fc.value === 'transparent'
@@ -720,7 +720,7 @@
 
 						<!-- Custom Fill Color Picker Button -->
 						<label
-							class="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-dashed border-(--surface-3) bg-(--surface-2)/40 transition-all focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1] hover:bg-(--surface-2)"
+							class="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded border border-dashed border-(--surface-3) bg-(--surface-2)/40 transition-all focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1] hover:bg-(--surface-2)"
 							title="Custom fill color"
 							aria-label="Custom fill color"
 						>
@@ -747,7 +747,7 @@
 
 					{#if isCustomFillColor}
 						<div
-							class="mt-1 flex items-center justify-between rounded-lg border border-(--surface-2) bg-(--surface-0)/70 px-2 py-1"
+							class="mt-1 flex items-center justify-between rounded border border-(--surface-2) bg-(--surface-0)/70 px-2 py-1"
 						>
 							<div class="flex items-center gap-1.5">
 								<span
@@ -768,12 +768,12 @@
 					<div class="pt-1">
 						<div class="mb-1 text-[9px] font-medium text-(--ink-3) uppercase">Fill Pattern</div>
 						<div
-							class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+							class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 						>
 							{#each FILL_STYLES as fs}
 								<button
 									onclick={() => setFillStyle(fs.value)}
-									class="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium transition-all {activeFillStyle ===
+									class="flex flex-1 items-center justify-center gap-1 rounded py-1.5 text-xs font-medium transition-all {activeFillStyle ===
 									fs.value
 										? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 										: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -823,12 +823,12 @@
 						Stroke Width
 					</div>
 					<div
-						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 					>
 						{#each STROKE_WIDTHS as sw}
 							<button
 								onclick={() => setWidth(sw.value)}
-								class="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium transition-all {activeWidth ===
+								class="flex flex-1 flex-col items-center justify-center gap-1 rounded py-1.5 text-xs font-medium transition-all {activeWidth ===
 								sw.value
 									? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 									: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -851,11 +851,11 @@
 						Stroke Style
 					</div>
 					<div
-						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 					>
 						<button
 							onclick={() => setStrokeStyle('solid')}
-							class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
+							class="flex flex-1 items-center justify-center rounded py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
 							'solid'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -874,7 +874,7 @@
 						</button>
 						<button
 							onclick={() => setStrokeStyle('dashed')}
-							class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
+							class="flex flex-1 items-center justify-center rounded py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
 							'dashed'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -894,7 +894,7 @@
 						</button>
 						<button
 							onclick={() => setStrokeStyle('dotted')}
-							class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
+							class="flex flex-1 items-center justify-center rounded py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
 							'dotted'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -922,11 +922,11 @@
 				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">Edges</div>
 					<div
-						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 					>
 						<button
 							onclick={() => setRoundness('sharp')}
-							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeRoundness ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-medium transition-all {activeRoundness ===
 							'sharp'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -946,7 +946,7 @@
 						</button>
 						<button
 							onclick={() => setRoundness('round')}
-							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeRoundness ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-medium transition-all {activeRoundness ===
 							'round'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -975,11 +975,11 @@
 						Arrow Routing
 					</div>
 					<div
-						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 					>
 						<button
 							onclick={() => setArrowRouting('orthogonal')}
-							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeArrowRouting ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-medium transition-all {activeArrowRouting ===
 							'orthogonal'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -1000,7 +1000,7 @@
 						</button>
 						<button
 							onclick={() => setArrowRouting('straight')}
-							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeArrowRouting ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded py-1.5 text-xs font-medium transition-all {activeArrowRouting ===
 							'straight'
 								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -1028,12 +1028,12 @@
 				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">Font</div>
 					<div
-						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 					>
 						{#each FONT_FAMILY_OPTIONS as f}
 							<button
 								onclick={() => setFontFamily(f.value)}
-								class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeFontFamily ===
+								class="flex flex-1 items-center justify-center rounded py-1.5 text-xs font-medium transition-all {activeFontFamily ===
 								f.value
 									? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 									: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -1045,12 +1045,12 @@
 						{/each}
 					</div>
 					<div
-						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 					>
 						{#each FONT_SIZES as s}
 							<button
 								onclick={() => setFontSize(s.value)}
-								class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeFontSize ===
+								class="flex flex-1 items-center justify-center rounded py-1.5 text-xs font-medium transition-all {activeFontSize ===
 								s.value
 									? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
 									: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
@@ -1083,12 +1083,12 @@
 					class="h-1.5 w-full cursor-pointer accent-[#6366f1]"
 				/>
 				<div
-					class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					class="flex items-center rounded-md border border-(--surface-2) bg-(--surface-0) p-0.5"
 				>
 					{#each OPACITY_PRESETS as op}
 						<button
 							onclick={() => setOpacity(op.value)}
-							class="flex flex-1 items-center justify-center rounded-lg py-1 font-mono text-[10px] font-medium transition-all {Math.abs(
+							class="flex flex-1 items-center justify-center rounded py-1 font-mono text-[10px] font-medium transition-all {Math.abs(
 								activeOpacity - op.value
 							) < 0.05
 								? 'border border-white/5 bg-(--surface-2) font-bold text-(--ink-1) shadow-xs'
@@ -1110,7 +1110,7 @@
 						<!-- Duplicate -->
 						<button
 							onclick={() => engine?.duplicateSelected()}
-							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-md border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 							title="Duplicate ({selectedCount}) [Ctrl+D / Cmd+D]"
 							aria-label="Duplicate selected items"
 						>
@@ -1130,7 +1130,7 @@
 						<!-- Bring to Front -->
 						<button
 							onclick={() => engine?.bringToFront()}
-							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-md border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 							title="Bring to Front [Ctrl+] / Cmd+]]"
 							aria-label="Bring to front"
 						>
@@ -1152,7 +1152,7 @@
 						<!-- Send to Back -->
 						<button
 							onclick={() => engine?.sendToBack()}
-							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-md border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 							title="Send to Back [Ctrl+[ / Cmd+[]"
 							aria-label="Send to back"
 						>
@@ -1174,7 +1174,7 @@
 						<!-- Delete -->
 						<button
 							onclick={handleDelete}
-							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-rose-500/20 bg-(--surface-0) py-2 text-rose-400 transition-all hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-md border border-rose-500/20 bg-(--surface-0) py-2 text-rose-400 transition-all hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus:outline-none"
 							title="Delete Selection ({selectedCount}) [Del/Backspace]"
 							aria-label="Delete selected items"
 						>
@@ -1200,16 +1200,16 @@
 
 <!-- PRIMARY BOTTOM DOCK (Clean, tools-focused, always visible) -->
 <div
-	class="fixed bottom-6 left-1/2 z-20 flex max-w-[95vw] -translate-x-1/2 items-center gap-1.5 overflow-visible rounded-xl border border-(--surface-2) bg-(--surface-1) px-2.5 py-2 shadow-2xl backdrop-blur-md select-none"
+	class="fixed bottom-6 left-1/2 z-20 flex max-w-[95vw] -translate-x-1/2 items-center gap-1.5 overflow-visible rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 py-1.5 shadow-xl backdrop-blur-md select-none"
 >
 	<!-- Scrollable Tools Area (for mobile & small viewports) -->
-	<div class="no-scrollbar flex max-w-full items-center gap-1.5 overflow-x-auto py-0.5">
+	<div class="no-scrollbar flex max-w-full items-center gap-1 overflow-x-auto py-0.5">
 		<!-- Undo / Redo Group -->
 		<div class="flex items-center gap-0.5">
 			<button
 				onclick={onUndo}
 				disabled={!canUndo}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {canUndo
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {canUndo
 					? 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'
 					: 'cursor-not-allowed text-(--ink-disabled) opacity-40'}"
 				title="Undo (Ctrl+Z / Cmd+Z)"
@@ -1223,7 +1223,7 @@
 			<button
 				onclick={onRedo}
 				disabled={!canRedo}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {canRedo
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {canRedo
 					? 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'
 					: 'cursor-not-allowed text-(--ink-disabled) opacity-40'}"
 				title="Redo (Ctrl+Shift+Z / Cmd+Shift+Z)"
@@ -1236,16 +1236,16 @@
 			</button>
 		</div>
 
-		<div class="mx-0.5 h-5 w-px bg-(--surface-2)"></div>
+		<div class="mx-0.5 h-4 w-px bg-(--surface-2)"></div>
 
 		<!-- Tools Group -->
-		<div class="flex items-center gap-1">
+		<div class="flex items-center gap-0.5">
 			<!-- Select (V) -->
 			<button
 				onclick={() => selectTool('select')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'select'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Select (V)"
 				aria-label="Select tool"
@@ -1258,9 +1258,9 @@
 			<!-- Pen (P) -->
 			<button
 				onclick={() => selectTool('pen')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'pen'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Pen (P)"
 				aria-label="Pen tool"
@@ -1276,9 +1276,9 @@
 			<!-- Line (L) -->
 			<button
 				onclick={() => selectTool('line')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'line'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Line (L) [Hold Shift for 45° snap]"
 				aria-label="Line tool"
@@ -1291,9 +1291,9 @@
 			<!-- Arrow (A) -->
 			<button
 				onclick={() => selectTool('arrow')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'arrow'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Arrow (A) [Hold Shift for 45° snap]"
 				aria-label="Arrow tool"
@@ -1307,9 +1307,9 @@
 			<!-- Rectangle (R) -->
 			<button
 				onclick={() => selectTool('rectangle')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'rectangle'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Rectangle (R)"
 				aria-label="Rectangle tool"
@@ -1322,9 +1322,9 @@
 			<!-- Diamond (D) -->
 			<button
 				onclick={() => selectTool('diamond')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'diamond'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Diamond (D)"
 				aria-label="Diamond tool"
@@ -1337,9 +1337,9 @@
 			<!-- Ellipse (E) -->
 			<button
 				onclick={() => selectTool('ellipse')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'ellipse'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Ellipse (E)"
 				aria-label="Ellipse tool"
@@ -1352,9 +1352,9 @@
 			<!-- Text (T) -->
 			<button
 				onclick={() => selectTool('text')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'text'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Text (T)"
 				aria-label="Text tool"
@@ -1369,9 +1369,9 @@
 			<!-- Sticky Note (S) -->
 			<button
 				onclick={() => selectTool('sticky_note')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'sticky_note'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Sticky Note (S)"
 				aria-label="Sticky Note tool"
@@ -1385,9 +1385,9 @@
 			<!-- Pan / Hand -->
 			<button
 				onclick={() => selectTool('pan')}
-				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				class="flex items-center justify-center rounded-md p-1.5 text-sm transition-all focus:outline-none {activeTool ===
 				'pan'
-					? 'bg-[#6366f1] text-white'
+					? 'bg-[#6366f1] text-white shadow-xs'
 					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 				title="Pan Canvas (Space)"
 				aria-label="Pan tool"
@@ -1403,12 +1403,12 @@
 			</button>
 		</div>
 
-		<div class="mx-0.5 h-5 w-px bg-(--surface-2)"></div>
+		<div class="mx-0.5 h-4 w-px bg-(--surface-2)"></div>
 
 		<!-- Clear Entire Canvas -->
 		<button
 			onclick={onClearCanvas}
-			class="rounded-lg p-2 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-rose-400 focus:outline-none"
+			class="rounded-md p-1.5 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-rose-400 focus:outline-none"
 			title="Clear entire canvas"
 			aria-label="Clear canvas"
 		>
@@ -1425,12 +1425,12 @@
 		</button>
 	</div>
 
-	<div class="mx-0.5 h-5 w-px shrink-0 bg-(--surface-2)"></div>
+	<div class="mx-0.5 h-4 w-px shrink-0 bg-(--surface-2)"></div>
 
 	<!-- Text to Diagram (Mermaid) Button -->
 	<button
 		onclick={onOpenMermaid}
-		class="flex shrink-0 items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+		class="flex shrink-0 items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 		title="Text to Diagram / Mermaid (M)"
 		aria-label="Text to Diagram"
 	>
@@ -1450,7 +1450,7 @@
 		<span class="hidden sm:inline">Diagram</span>
 	</button>
 
-	<div class="mx-0.5 h-5 w-px shrink-0 bg-(--surface-2)"></div>
+	<div class="mx-0.5 h-4 w-px shrink-0 bg-(--surface-2)"></div>
 
 	<!-- Hidden File Input for JSON Import -->
 	<input
@@ -1465,7 +1465,7 @@
 	<div class="relative shrink-0">
 		<button
 			onclick={() => (showExportMenu = !showExportMenu)}
-			class="flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors focus:outline-none {showExportMenu
+			class="flex items-center gap-1 rounded-md px-2 py-1.5 text-xs font-medium transition-colors focus:outline-none {showExportMenu
 				? 'bg-(--surface-2) text-(--ink-1)'
 				: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
 			title="Export or Import whiteboard"
@@ -1495,28 +1495,28 @@
 			></div>
 
 			<div
-				class="absolute right-0 bottom-full z-30 mb-3 w-48 rounded-xl border border-(--surface-2) bg-(--surface-1) p-1.5 shadow-2xl backdrop-blur-md"
+				class="absolute right-0 bottom-full z-30 mb-3 w-48 rounded-lg border border-(--surface-2) bg-(--surface-1) p-1.5 shadow-xl backdrop-blur-md"
 			>
 				<div class="px-2 py-1 text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
 					Export
 				</div>
 				<button
 					onclick={handleExportPng}
-					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+					class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
 				>
 					<span class="font-mono text-[10px] font-bold text-[#6366f1]">PNG</span>
 					<span>Image (2x Retina)</span>
 				</button>
 				<button
 					onclick={handleExportSvg}
-					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+					class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
 				>
 					<span class="font-mono text-[10px] font-bold text-[#10b981]">SVG</span>
 					<span>Vector Graphics</span>
 				</button>
 				<button
 					onclick={handleExportJson}
-					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+					class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
 				>
 					<span class="font-mono text-[10px] font-bold text-[#06b6d4]">JSON</span>
 					<span>Mesh Room Backup</span>
@@ -1532,7 +1532,7 @@
 						showExportMenu = false;
 						onOpenMermaid?.();
 					}}
-					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+					class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
 				>
 					<svg
 						class="h-3.5 w-3.5 text-indigo-400"
@@ -1549,7 +1549,7 @@
 				</button>
 				<button
 					onclick={triggerImport}
-					class="flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+					class="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
 				>
 					<svg
 						class="h-3.5 w-3.5 text-[#f59e0b]"
