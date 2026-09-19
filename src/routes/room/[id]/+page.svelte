@@ -67,8 +67,8 @@
 			}
 
 			if (isMod && (e.key === 'v' || e.key === 'V')) {
-				e.preventDefault();
-				engine?.paste();
+				// Allow native browser 'paste' event to fire naturally!
+				// Native 'paste' event provides direct, synchronous, popup-free clipboard access.
 				return;
 			}
 
@@ -172,6 +172,12 @@
 					}
 				} catch {
 					// Not valid mesh JSON
+				}
+
+				if (text.trim()) {
+					e.preventDefault();
+					engine?.pastePlainText(text);
+					return;
 				}
 			}
 			if (engine?.hasClipboard()) {
