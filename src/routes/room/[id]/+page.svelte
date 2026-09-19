@@ -334,15 +334,15 @@
 		<!-- Top Left Brand / Return Home -->
 		<a
 			href="/"
-			class="group fixed top-4 left-4 z-20 flex h-9 items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1)/90 px-3 shadow-lg backdrop-blur-md transition-colors select-none hover:border-(--surface-3) hover:bg-(--surface-2)"
+			class="group fixed top-4 left-4 z-20 flex h-9 w-9 items-center justify-center rounded-lg border border-(--surface-2) bg-(--surface-1)/90 shadow-lg backdrop-blur-md transition-all select-none hover:border-(--surface-3) hover:bg-(--surface-2) focus:outline-none"
 			title="Back to Mesh Home"
+			aria-label="Back to Mesh Home"
 		>
 			<img
 				src={logo}
 				alt="Mesh Logo"
-				class="h-5 w-5 rounded-md object-cover shadow-sm transition-transform group-hover:scale-105"
+				class="h-5.5 w-5.5 rounded-md object-cover shadow-sm transition-transform group-hover:scale-105"
 			/>
-			<span class="text-xs font-semibold tracking-tight text-(--ink-1)">Mesh</span>
 		</a>
 
 		<!-- Top Presence & Room Header -->
