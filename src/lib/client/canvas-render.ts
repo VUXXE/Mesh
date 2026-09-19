@@ -9,7 +9,14 @@ import {
 	type QuickAddButton
 } from './math';
 import { getFontFamilyCss, wrapText } from './canvas-text';
-import type { PathPoint, PeerPresence, ShapeRecord } from '../types';
+import type {
+	CornerRoundness,
+	FillStyle,
+	PathPoint,
+	PeerPresence,
+	ShapeRecord,
+	StrokeStyle
+} from '../types';
 
 export interface DrawShapeOptions {
 	editingShapeId?: string | null;
@@ -48,6 +55,48 @@ export function drawArrowHead(
 	ctx.restore();
 }
 
+export function drawHachureFill(
+	ctx: CanvasRenderingContext2D,
+	fillColor: string,
+	bounds: { minX: number; minY: number; width: number; height: number },
+	isCrossHatch = false,
+	strokeWidth = 2
+) {
+	if (!fillColor || fillColor === 'transparent') return;
+
+	ctx.save();
+	ctx.strokeStyle = fillColor;
+	ctx.lineWidth = Math.max(1, Math.min(strokeWidth, 2.5));
+	ctx.lineCap = 'round';
+	if (typeof ctx.setLineDash === 'function') {
+		ctx.setLineDash([]);
+	}
+
+	const gap = 10;
+	const { minX, minY, width, height } = bounds;
+	const startX = minX - height - 30;
+	const endX = minX + width + height + 30;
+
+	// Diagonal 45° lines
+	ctx.beginPath();
+	for (let x = startX; x <= endX; x += gap) {
+		ctx.moveTo(x, minY - 10);
+		ctx.lineTo(x + height + 20, minY + height + 10);
+	}
+	ctx.stroke();
+
+	if (isCrossHatch) {
+		ctx.beginPath();
+		for (let x = startX; x <= endX; x += gap) {
+			ctx.moveTo(x + height + 20, minY - 10);
+			ctx.lineTo(x, minY + height + 10);
+		}
+		ctx.stroke();
+	}
+
+	ctx.restore();
+}
+
 export function drawShape(
 	ctx: CanvasRenderingContext2D,
 	shape: ShapeRecord,
@@ -58,38 +107,85 @@ export function drawShape(
 
 	ctx.save();
 
+	const opacity =
+		shape.data?.opacity !== undefined && shape.data?.opacity !== null
+			? Number(shape.data.opacity)
+			: 1;
+	ctx.globalAlpha = Math.max(0.05, Math.min(1, opacity));
+
+	const strokeStyle: StrokeStyle = shape.data?.strokeStyle || 'solid';
+	const sw = shape.strokeWidth || 2;
+	if (typeof ctx.setLineDash === 'function') {
+		if (strokeStyle === 'dashed') {
+			ctx.setLineDash([Math.max(sw * 3, 8), Math.max(sw * 2, 6)]);
+		} else if (strokeStyle === 'dotted') {
+			ctx.setLineDash([Math.max(sw, 2), Math.max(sw * 2, 5)]);
+		} else {
+			ctx.setLineDash([]);
+		}
+	}
+
 	ctx.strokeStyle = shape.stroke || defaultStroke;
 	ctx.fillStyle = shape.fill || 'transparent';
-	ctx.lineWidth = shape.strokeWidth || 2;
+	ctx.lineWidth = sw;
 	ctx.lineCap = 'round';
 	ctx.lineJoin = 'round';
 
 	if (shape.type === 'path') {
 		const points: PathPoint[] = shape.data?.points ?? [];
 		if (points.length >= 2) {
-			ctx.beginPath();
-			ctx.moveTo(points[0].x, points[0].y);
-			for (let i = 1; i < points.length; i++) {
-				ctx.lineTo(points[i].x, points[i].y);
-			}
 			if (shape.data?.isDiamond) {
+				const fillStyle: FillStyle = shape.data?.fillStyle || 'solid';
+				if (shape.fill && shape.fill !== 'transparent') {
+					if (fillStyle === 'hachure' || fillStyle === 'cross-hatch') {
+						ctx.save();
+						ctx.beginPath();
+						ctx.moveTo(points[0].x, points[0].y);
+						for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+						ctx.closePath();
+						ctx.clip();
+						drawHachureFill(
+							ctx,
+							shape.fill,
+							{ minX: shape.x, minY: shape.y, width: shape.width, height: shape.height },
+							fillStyle === 'cross-hatch',
+							sw
+						);
+						ctx.restore();
+					} else {
+						ctx.beginPath();
+						ctx.moveTo(points[0].x, points[0].y);
+						for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+						ctx.closePath();
+						ctx.fill();
+					}
+				}
+				ctx.beginPath();
+				ctx.moveTo(points[0].x, points[0].y);
+				for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
 				ctx.closePath();
-				if (shape.fill && shape.fill !== 'transparent') ctx.fill();
-			}
-			ctx.stroke();
+				ctx.stroke();
+			} else {
+				ctx.beginPath();
+				ctx.moveTo(points[0].x, points[0].y);
+				for (let i = 1; i < points.length; i++) {
+					ctx.lineTo(points[i].x, points[i].y);
+				}
+				ctx.stroke();
 
-			if (shape.data?.isArrow && points.length >= 2) {
-				const p1 = points[points.length - 2];
-				const p2 = points[points.length - 1];
-				drawArrowHead(
-					ctx,
-					p1.x,
-					p1.y,
-					p2.x,
-					p2.y,
-					shape.stroke || defaultStroke,
-					shape.strokeWidth || 2
-				);
+				if (shape.data?.isArrow && points.length >= 2) {
+					const p1 = points[points.length - 2];
+					const p2 = points[points.length - 1];
+					drawArrowHead(
+						ctx,
+						p1.x,
+						p1.y,
+						p2.x,
+						p2.y,
+						shape.stroke || defaultStroke,
+						shape.strokeWidth || 2
+					);
+				}
 			}
 
 			if (shape.data?.isDiamond && (editingShapeId !== shape.id || !isStaticCtx)) {
@@ -97,24 +193,72 @@ export function drawShape(
 			}
 		}
 	} else if (shape.type === 'rectangle') {
-		ctx.beginPath();
 		const rx = Math.min(shape.x, shape.x + shape.width);
 		const ry = Math.min(shape.y, shape.y + shape.height);
 		const rw = Math.max(Math.abs(shape.width), 1);
 		const rh = Math.max(Math.abs(shape.height), 1);
-		ctx.roundRect(rx, ry, rw, rh, 4);
-		if (shape.fill && shape.fill !== 'transparent') ctx.fill();
+		const isRound = shape.data?.roundness === 'round' || shape.data?.roundness === undefined;
+		const cr = isRound ? Math.min(10, Math.min(rw, rh) / 4) : 0;
+		const fillStyle: FillStyle = shape.data?.fillStyle || 'solid';
+
+		if (shape.fill && shape.fill !== 'transparent') {
+			if (fillStyle === 'hachure' || fillStyle === 'cross-hatch') {
+				ctx.save();
+				ctx.beginPath();
+				ctx.roundRect(rx, ry, rw, rh, cr);
+				ctx.clip();
+				drawHachureFill(
+					ctx,
+					shape.fill,
+					{ minX: rx, minY: ry, width: rw, height: rh },
+					fillStyle === 'cross-hatch',
+					sw
+				);
+				ctx.restore();
+			} else {
+				ctx.beginPath();
+				ctx.roundRect(rx, ry, rw, rh, cr);
+				ctx.fill();
+			}
+		}
+
+		ctx.beginPath();
+		ctx.roundRect(rx, ry, rw, rh, cr);
 		ctx.stroke();
 
 		if (editingShapeId !== shape.id || !isStaticCtx) {
 			drawShapeCenteredText(ctx, shape, defaultStroke);
 		}
 	} else if (shape.type === 'ellipse') {
-		ctx.beginPath();
 		const rx = Math.max(Math.abs(shape.width / 2), 1);
 		const ry = Math.max(Math.abs(shape.height / 2), 1);
-		ctx.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, rx, ry, 0, 0, Math.PI * 2);
-		if (shape.fill && shape.fill !== 'transparent') ctx.fill();
+		const cx = shape.x + shape.width / 2;
+		const cy = shape.y + shape.height / 2;
+		const fillStyle: FillStyle = shape.data?.fillStyle || 'solid';
+
+		if (shape.fill && shape.fill !== 'transparent') {
+			if (fillStyle === 'hachure' || fillStyle === 'cross-hatch') {
+				ctx.save();
+				ctx.beginPath();
+				ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+				ctx.clip();
+				drawHachureFill(
+					ctx,
+					shape.fill,
+					{ minX: cx - rx, minY: cy - ry, width: rx * 2, height: ry * 2 },
+					fillStyle === 'cross-hatch',
+					sw
+				);
+				ctx.restore();
+			} else {
+				ctx.beginPath();
+				ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
+		ctx.beginPath();
+		ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
 		ctx.stroke();
 
 		if (editingShapeId !== shape.id || !isStaticCtx) {
@@ -281,9 +425,23 @@ export function drawActiveStroke(
 	ctx: CanvasRenderingContext2D,
 	points: PathPoint[],
 	strokeColor: string,
-	strokeWidth: number
+	strokeWidth: number,
+	options?: {
+		strokeStyle?: StrokeStyle;
+		opacity?: number;
+	}
 ) {
 	if (points.length <= 1) return;
+
+	ctx.save();
+	if (options?.opacity !== undefined && options.opacity < 1) {
+		ctx.globalAlpha *= options.opacity;
+	}
+	if (options?.strokeStyle === 'dashed') {
+		ctx.setLineDash([Math.max(strokeWidth * 3, 8), Math.max(strokeWidth * 2, 6)]);
+	} else if (options?.strokeStyle === 'dotted') {
+		ctx.setLineDash([Math.max(strokeWidth, 2), Math.max(strokeWidth * 2, 5)]);
+	}
 
 	ctx.beginPath();
 	ctx.strokeStyle = strokeColor;
@@ -296,6 +454,7 @@ export function drawActiveStroke(
 		ctx.lineTo(points[i].x, points[i].y);
 	}
 	ctx.stroke();
+	ctx.restore();
 }
 
 export function drawLinePreview(
@@ -308,11 +467,28 @@ export function drawLinePreview(
 	isShiftPressed: boolean,
 	routing: 'straight' | 'orthogonal' = 'straight',
 	startSide?: AnchorSide,
-	endSide?: AnchorSide
+	endSide?: AnchorSide,
+	styleOptions?: {
+		strokeStyle?: StrokeStyle;
+		opacity?: number;
+	}
 ) {
 	const end = calculateLineEndPoint(startPoint, currentPoint, isShiftPressed);
 
 	ctx.save();
+
+	const opacity = styleOptions?.opacity !== undefined ? Number(styleOptions.opacity) : 1;
+	ctx.globalAlpha = Math.max(0.05, Math.min(1, opacity));
+
+	const strokeStyle: StrokeStyle = styleOptions?.strokeStyle || 'solid';
+	if (strokeStyle === 'dashed') {
+		ctx.setLineDash([Math.max(strokeWidth * 3, 8), Math.max(strokeWidth * 2, 6)]);
+	} else if (strokeStyle === 'dotted') {
+		ctx.setLineDash([Math.max(strokeWidth, 2), Math.max(strokeWidth * 2, 5)]);
+	} else {
+		ctx.setLineDash([]);
+	}
+
 	ctx.strokeStyle = strokeColor;
 	ctx.fillStyle = strokeColor;
 	ctx.lineWidth = strokeWidth;
@@ -355,7 +531,13 @@ export function drawShapePreview(
 	tool: string,
 	strokeColor: string,
 	fillColor: string,
-	strokeWidth: number
+	strokeWidth: number,
+	styleOptions?: {
+		strokeStyle?: StrokeStyle;
+		fillStyle?: FillStyle;
+		roundness?: CornerRoundness;
+		opacity?: number;
+	}
 ) {
 	const x = Math.min(startPoint.x, currentPoint.x);
 	const y = Math.min(startPoint.y, currentPoint.y);
@@ -363,9 +545,24 @@ export function drawShapePreview(
 	const h = Math.abs(currentPoint.y - startPoint.y);
 
 	ctx.save();
+
+	const opacity = styleOptions?.opacity !== undefined ? Number(styleOptions.opacity) : 1;
+	ctx.globalAlpha = Math.max(0.05, Math.min(1, opacity));
+
+	const strokeStyle: StrokeStyle = styleOptions?.strokeStyle || 'solid';
+	if (strokeStyle === 'dashed') {
+		ctx.setLineDash([Math.max(strokeWidth * 3, 8), Math.max(strokeWidth * 2, 6)]);
+	} else if (strokeStyle === 'dotted') {
+		ctx.setLineDash([Math.max(strokeWidth, 2), Math.max(strokeWidth * 2, 5)]);
+	} else {
+		ctx.setLineDash([]);
+	}
+
 	ctx.strokeStyle = tool === 'sticky_note' ? '#eab308' : strokeColor;
 	ctx.fillStyle = tool === 'sticky_note' ? 'rgba(254, 240, 138, 0.4)' : fillColor;
 	ctx.lineWidth = strokeWidth;
+	ctx.lineCap = 'round';
+	ctx.lineJoin = 'round';
 
 	if (tool === 'sticky_note') {
 		ctx.beginPath();
@@ -373,23 +570,102 @@ export function drawShapePreview(
 		ctx.fill();
 		ctx.stroke();
 	} else if (tool === 'rectangle') {
+		const isRound = styleOptions?.roundness === 'round' || styleOptions?.roundness === undefined;
+		const cr = isRound ? Math.min(10, Math.min(w, h) / 4) : 0;
+		const fillStyle = styleOptions?.fillStyle || 'solid';
+
+		if (fillColor && fillColor !== 'transparent') {
+			if (fillStyle === 'hachure' || fillStyle === 'cross-hatch') {
+				ctx.save();
+				ctx.beginPath();
+				ctx.roundRect(x, y, w, h, cr);
+				ctx.clip();
+				drawHachureFill(
+					ctx,
+					fillColor,
+					{ minX: x, minY: y, width: w, height: h },
+					fillStyle === 'cross-hatch',
+					strokeWidth
+				);
+				ctx.restore();
+			} else {
+				ctx.beginPath();
+				ctx.roundRect(x, y, w, h, cr);
+				ctx.fill();
+			}
+		}
+
 		ctx.beginPath();
-		ctx.rect(x, y, w, h);
-		if (fillColor !== 'transparent') ctx.fill();
+		ctx.roundRect(x, y, w, h, cr);
 		ctx.stroke();
 	} else if (tool === 'ellipse') {
+		const rx = Math.max(w / 2, 1);
+		const ry = Math.max(h / 2, 1);
+		const cx = x + rx;
+		const cy = y + ry;
+		const fillStyle = styleOptions?.fillStyle || 'solid';
+
+		if (fillColor && fillColor !== 'transparent') {
+			if (fillStyle === 'hachure' || fillStyle === 'cross-hatch') {
+				ctx.save();
+				ctx.beginPath();
+				ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+				ctx.clip();
+				drawHachureFill(
+					ctx,
+					fillColor,
+					{ minX: x, minY: y, width: w, height: h },
+					fillStyle === 'cross-hatch',
+					strokeWidth
+				);
+				ctx.restore();
+			} else {
+				ctx.beginPath();
+				ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+				ctx.fill();
+			}
+		}
+
 		ctx.beginPath();
-		ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
-		if (fillColor !== 'transparent') ctx.fill();
+		ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
 		ctx.stroke();
 	} else if (tool === 'diamond') {
+		const fillStyle = styleOptions?.fillStyle || 'solid';
+		if (fillColor && fillColor !== 'transparent') {
+			if (fillStyle === 'hachure' || fillStyle === 'cross-hatch') {
+				ctx.save();
+				ctx.beginPath();
+				ctx.moveTo(x + w / 2, y);
+				ctx.lineTo(x + w, y + h / 2);
+				ctx.lineTo(x + w / 2, y + h);
+				ctx.lineTo(x, y + h / 2);
+				ctx.closePath();
+				ctx.clip();
+				drawHachureFill(
+					ctx,
+					fillColor,
+					{ minX: x, minY: y, width: w, height: h },
+					fillStyle === 'cross-hatch',
+					strokeWidth
+				);
+				ctx.restore();
+			} else {
+				ctx.beginPath();
+				ctx.moveTo(x + w / 2, y);
+				ctx.lineTo(x + w, y + h / 2);
+				ctx.lineTo(x + w / 2, y + h);
+				ctx.lineTo(x, y + h / 2);
+				ctx.closePath();
+				ctx.fill();
+			}
+		}
+
 		ctx.beginPath();
 		ctx.moveTo(x + w / 2, y);
 		ctx.lineTo(x + w, y + h / 2);
 		ctx.lineTo(x + w / 2, y + h);
 		ctx.lineTo(x, y + h / 2);
 		ctx.closePath();
-		if (fillColor !== 'transparent') ctx.fill();
 		ctx.stroke();
 	}
 	ctx.restore();
