@@ -223,44 +223,72 @@
 			selectedCount > 0
 	);
 
+	function getToolDisplayName(tool: ToolMode): string {
+		switch (tool) {
+			case 'select':
+				return 'Select';
+			case 'pen':
+				return 'Draw';
+			case 'line':
+				return 'Line';
+			case 'arrow':
+				return 'Arrow';
+			case 'rectangle':
+				return 'Rectangle';
+			case 'diamond':
+				return 'Diamond';
+			case 'ellipse':
+				return 'Ellipse';
+			case 'text':
+				return 'Text';
+			case 'sticky_note':
+				return 'Sticky Note';
+			case 'pan':
+				return 'Pan';
+			default:
+				return 'Tool';
+		}
+	}
+
+	// Excalidraw-grade Harmonious Color Palettes
 	const STROKE_COLORS = [
-		{ label: 'White', value: '#f4f4f5' },
-		{ label: 'Slate', value: '#94a3b8' },
-		{ label: 'Zinc', value: '#71717a' },
-		{ label: 'Charcoal', value: '#27272a' },
-		{ label: 'Red', value: '#ef4444' },
-		{ label: 'Rose', value: '#f43f5e' },
-		{ label: 'Pink', value: '#ec4899' },
-		{ label: 'Purple', value: '#a855f7' },
-		{ label: 'Indigo', value: '#6366f1' },
-		{ label: 'Blue', value: '#3b82f6' },
-		{ label: 'Cyan', value: '#06b6d4' },
-		{ label: 'Teal', value: '#14b8a6' },
-		{ label: 'Emerald', value: '#10b981' },
-		{ label: 'Green', value: '#22c55e' },
-		{ label: 'Lime', value: '#84cc16' },
-		{ label: 'Amber', value: '#f59e0b' },
-		{ label: 'Orange', value: '#f97316' }
+		{ label: 'White', value: '#ffffff' },
+		{ label: 'Light Zinc', value: '#d4d4d8' },
+		{ label: 'Slate Gray', value: '#64748b' },
+		{ label: 'Dark Zinc', value: '#27272a' },
+		{ label: 'Crimson Red', value: '#e03131' },
+		{ label: 'Coral Rose', value: '#f43f5e' },
+		{ label: 'Barbie Pink', value: '#ec4899' },
+		{ label: 'Royal Purple', value: '#9c36b5' },
+		{ label: 'Indigo Accent', value: '#6366f1' },
+		{ label: 'Vivid Blue', value: '#1971c2' },
+		{ label: 'Sky Blue', value: '#0ea5e9' },
+		{ label: 'Teal Green', value: '#0c8599' },
+		{ label: 'Mint Emerald', value: '#099268' },
+		{ label: 'Forest Green', value: '#2f9e44' },
+		{ label: 'Lime Olive', value: '#66a80f' },
+		{ label: 'Sun Yellow', value: '#f08c00' },
+		{ label: 'Warm Orange', value: '#e8590c' }
 	];
 
 	const FILL_COLORS = [
 		{ label: 'None', value: 'transparent' },
-		{ label: 'White', value: '#ffffff' },
-		{ label: 'Slate', value: '#94a3b8' },
-		{ label: 'Charcoal', value: '#27272a' },
-		{ label: 'Pastel Red', value: '#fecdd3' },
-		{ label: 'Vivid Red', value: '#ef4444' },
-		{ label: 'Pastel Pink', value: '#fbcfe8' },
-		{ label: 'Pastel Purple', value: '#e9d5ff' },
-		{ label: 'Pastel Indigo', value: '#c7d2fe' },
-		{ label: 'Vivid Blue', value: '#3b82f6' },
-		{ label: 'Pastel Cyan', value: '#cffafe' },
-		{ label: 'Pastel Teal', value: '#ccfbf1' },
-		{ label: 'Pastel Emerald', value: '#bbf7d0' },
-		{ label: 'Pastel Lime', value: '#ecfccb' },
-		{ label: 'Pastel Yellow', value: '#fef08a' },
-		{ label: 'Pastel Orange', value: '#fed7aa' },
-		{ label: 'Vivid Orange', value: '#f97316' }
+		{ label: 'Pure White', value: '#ffffff' },
+		{ label: 'Light Zinc', value: '#f4f4f5' },
+		{ label: 'Dark Charcoal', value: '#27272a' },
+		{ label: 'Pastel Red', value: '#ffc9c9' },
+		{ label: 'Vivid Red', value: '#e03131' },
+		{ label: 'Pastel Pink', value: '#fcc2d7' },
+		{ label: 'Pastel Purple', value: '#eebefa' },
+		{ label: 'Pastel Indigo', value: '#d0bfff' },
+		{ label: 'Pastel Blue', value: '#a5d8ff' },
+		{ label: 'Pastel Sky', value: '#cffafe' },
+		{ label: 'Pastel Teal', value: '#96f2d7' },
+		{ label: 'Pastel Emerald', value: '#b2f2bb' },
+		{ label: 'Pastel Lime', value: '#d8f5a2' },
+		{ label: 'Pastel Yellow', value: '#ffec99' },
+		{ label: 'Pastel Orange', value: '#ffd8a8' },
+		{ label: 'Vivid Amber', value: '#f08c00' }
 	];
 
 	const isCustomStrokeColor = $derived(
@@ -277,20 +305,20 @@
 	const FILL_STYLES: { label: string; value: FillStyle }[] = [
 		{ label: 'Solid', value: 'solid' },
 		{ label: 'Hachure', value: 'hachure' },
-		{ label: 'Cross-hatch', value: 'cross-hatch' }
+		{ label: 'Cross', value: 'cross-hatch' }
 	];
 
 	const OPACITY_PRESETS = [
-		{ label: '100%', value: 1 },
-		{ label: '75%', value: 0.75 },
+		{ label: '25%', value: 0.25 },
 		{ label: '50%', value: 0.5 },
-		{ label: '25%', value: 0.25 }
+		{ label: '75%', value: 0.75 },
+		{ label: '100%', value: 1 }
 	];
 
 	const STROKE_WIDTHS = [
-		{ label: 'Thin', value: 2 },
-		{ label: 'Medium', value: 4 },
-		{ label: 'Bold', value: 8 }
+		{ label: 'Thin', value: 2, barHeight: 2 },
+		{ label: 'Medium', value: 4, barHeight: 3.5 },
+		{ label: 'Bold', value: 8, barHeight: 5.5 }
 	];
 
 	function selectTool(tool: ToolMode) {
@@ -403,49 +431,163 @@
 	}
 </script>
 
-<!-- SIDE STYLING PANEL (Excalidraw-style properties on left side) -->
+<!-- SIDE STYLING PANEL (Excalidraw-grade left sidebar) -->
 {#if showSidePanel}
 	{#if isPanelCollapsed}
 		<div class="fixed top-16 left-4 z-20 select-none">
 			<button
 				onclick={() => (isPanelCollapsed = false)}
-				class="flex items-center gap-1.5 rounded-xl border border-(--surface-2) bg-(--surface-1)/95 px-3 py-2 text-xs font-medium text-(--ink-1) shadow-xl backdrop-blur-md transition-all hover:bg-(--surface-2)"
+				class="group flex items-center gap-2 rounded-xl border border-(--surface-2) bg-(--surface-1)/95 px-3 py-2 text-xs font-medium text-(--ink-1) shadow-xl backdrop-blur-md transition-all hover:border-(--surface-3) hover:bg-(--surface-2)"
 				title="Expand style panel"
 				aria-label="Expand style panel"
 			>
+				<span
+					class="flex h-5 w-5 items-center justify-center rounded-md bg-[#6366f1]/20 text-[#6366f1]"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
+						<circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
+						<circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
+						<circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
+						<path
+							d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"
+						/>
+					</svg>
+				</span>
+				<span>Properties</span>
 				<svg
-					class="h-4 w-4 text-[#6366f1]"
+					class="h-3.5 w-3.5 text-(--ink-3) transition-transform group-hover:translate-x-0.5 group-hover:text-(--ink-1)"
 					viewBox="0 0 24 24"
 					fill="none"
 					stroke="currentColor"
 					stroke-width="2"
 				>
-					<circle cx="13.5" cy="6.5" r=".5" fill="currentColor" />
-					<circle cx="17.5" cy="10.5" r=".5" fill="currentColor" />
-					<circle cx="8.5" cy="7.5" r=".5" fill="currentColor" />
-					<circle cx="6.5" cy="12.5" r=".5" fill="currentColor" />
-					<path
-						d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"
-					/>
+					<polyline points="9 18 15 12 9 6" />
 				</svg>
-				<span>Styles</span>
 			</button>
 		</div>
 	{:else}
 		<div
-			class="no-scrollbar fixed top-16 left-4 z-20 flex max-h-[calc(100vh-5.5rem)] w-60 flex-col gap-3.5 overflow-y-auto rounded-2xl border border-(--surface-2) bg-(--surface-1)/95 p-3 shadow-2xl backdrop-blur-md transition-all select-none"
+			class="no-scrollbar fixed top-16 left-4 z-20 flex max-h-[calc(100vh-5.5rem)] w-64 flex-col gap-3 overflow-y-auto rounded-2xl border border-(--surface-2) bg-(--surface-1)/95 p-3.5 shadow-2xl backdrop-blur-md transition-all select-none"
 		>
-			<!-- Panel Header: Title + Collapse Button -->
-			<div class="flex items-center justify-between border-b border-(--surface-2) pb-2">
-				<div class="flex items-center gap-1.5">
-					<span class="h-2 w-2 rounded-full bg-[#6366f1]"></span>
-					<span class="text-xs font-semibold tracking-tight text-(--ink-1)">
-						{selectedCount > 0 ? `${selectedCount} selected` : 'Properties'}
-					</span>
+			<!-- Sticky Header: Contextual Title + Collapse Chevron -->
+			<div
+				class="sticky -top-3.5 z-10 -mx-3.5 -mt-3.5 flex items-center justify-between border-b border-(--surface-2) bg-(--surface-1)/95 px-3.5 py-2.5 backdrop-blur-md"
+			>
+				<div class="flex items-center gap-2">
+					{#if selectedCount > 0}
+						<span
+							class="flex h-5 items-center justify-center rounded-md bg-[#6366f1]/20 px-1.5 font-mono text-[10px] font-bold text-[#6366f1]"
+						>
+							{selectedCount}
+						</span>
+						<span class="text-xs font-semibold tracking-tight text-(--ink-1)">
+							{selectedCount === 1 ? 'Selected Item' : `${selectedCount} Items Selected`}
+						</span>
+					{:else}
+						<span
+							class="flex h-5 w-5 items-center justify-center rounded-md bg-(--surface-2) text-xs text-[#6366f1]"
+						>
+							{#if activeTool === 'rectangle'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<rect x="3" y="3" width="18" height="18" rx="2" />
+								</svg>
+							{:else if activeTool === 'diamond'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<polygon points="12 2 22 12 12 22 2 12" />
+								</svg>
+							{:else if activeTool === 'ellipse'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<circle cx="12" cy="12" r="9" />
+								</svg>
+							{:else if activeTool === 'arrow'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<line x1="5" y1="19" x2="19" y2="5" />
+									<polyline points="10 5 19 5 19 14" />
+								</svg>
+							{:else if activeTool === 'line'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<line x1="5" y1="19" x2="19" y2="5" />
+								</svg>
+							{:else if activeTool === 'pen'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M12 19l7-7 3 3-7 7-3-3z" />
+									<path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+								</svg>
+							{:else if activeTool === 'text'}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<path d="M4 7V4h16v3" />
+									<path d="M9 20h6" />
+									<path d="M12 4v16" />
+								</svg>
+							{:else}
+								<svg
+									class="h-3 w-3"
+									viewBox="0 0 24 24"
+									fill="none"
+									stroke="currentColor"
+									stroke-width="2"
+								>
+									<circle cx="12" cy="12" r="9" />
+								</svg>
+							{/if}
+						</span>
+						<span class="text-xs font-semibold tracking-tight text-(--ink-1)">
+							{getToolDisplayName(activeTool)} Tool
+						</span>
+					{/if}
 				</div>
 				<button
 					onclick={() => (isPanelCollapsed = true)}
-					class="rounded-md p-1 text-(--ink-3) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1)"
+					class="rounded-lg p-1 text-(--ink-3) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1)"
 					title="Collapse panel"
 					aria-label="Collapse panel"
 				>
@@ -466,34 +608,36 @@
 				<div
 					class="flex items-center justify-between text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase"
 				>
-					<span>Stroke Color</span>
+					<span>Stroke</span>
 					<span class="font-mono text-[9px] text-(--ink-2)">{activeColor}</span>
 				</div>
 
-				<div class="grid grid-cols-6 gap-1.5">
+				<div class="grid grid-cols-6 justify-items-center gap-1.5">
 					{#each STROKE_COLORS as c}
 						<button
 							onclick={() => setColor(c.value)}
-							class="flex h-5 w-5 items-center justify-center rounded-full transition-transform focus:outline-none {activeColor.toLowerCase() ===
+							class="group relative flex h-6 w-6 items-center justify-center rounded-lg border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeColor.toLowerCase() ===
 							c.value.toLowerCase()
-								? 'scale-110 ring-2 ring-[#6366f1]'
-								: 'hover:scale-105'} {c.value === '#27272a' || c.value === '#18181b'
-								? 'border border-(--surface-2)'
+								? 'scale-105 ring-2 ring-[#6366f1] ring-offset-2 ring-offset-(--surface-1)'
 								: ''}"
 							style="background-color: {c.value};"
 							title={c.label}
 							aria-label="{c.label} stroke color"
 						>
 							{#if activeColor.toLowerCase() === c.value.toLowerCase()}
-								<span class="h-1.5 w-1.5 rounded-full bg-black/50"></span>
+								<span
+									class="h-1.5 w-1.5 rounded-full {c.value === '#ffffff' || c.value === '#d4d4d8'
+										? 'bg-black'
+										: 'bg-white'}"
+								></span>
 							{/if}
 						</button>
 					{/each}
 
 					<!-- Custom Stroke Color Picker Button -->
 					<label
-						class="relative flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-(--ink-3) transition-transform focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1]"
-						title="Custom Color (Hex / Eyedropper)"
+						class="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-dashed border-(--surface-3) bg-(--surface-2)/40 transition-all focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1] hover:bg-(--surface-2)"
+						title="Custom color (Hex / RGB / Eyedropper)"
 						aria-label="Custom stroke color"
 					>
 						<input
@@ -505,11 +649,11 @@
 							class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
 						/>
 						<svg
-							class="h-3 w-3 text-(--ink-2)"
+							class="h-3.5 w-3.5 text-(--ink-2)"
 							viewBox="0 0 24 24"
 							fill="none"
 							stroke="currentColor"
-							stroke-width="2"
+							stroke-width="2.5"
 						>
 							<line x1="12" y1="5" x2="12" y2="19" />
 							<line x1="5" y1="12" x2="19" y2="12" />
@@ -519,56 +663,65 @@
 
 				{#if isCustomStrokeColor}
 					<div
-						class="mt-1 flex items-center justify-between rounded-lg bg-(--surface-2)/60 px-2 py-0.5"
+						class="mt-1 flex items-center justify-between rounded-lg border border-(--surface-2) bg-(--surface-0)/70 px-2 py-1"
 					>
 						<div class="flex items-center gap-1.5">
 							<span
-								class="h-2.5 w-2.5 rounded-full border border-white/20"
+								class="h-3 w-3 rounded-full border border-white/20 shadow-xs"
 								style="background-color: {activeColor};"
 							></span>
-							<span class="font-mono text-[10px] text-(--ink-1) uppercase">{activeColor}</span>
+							<span class="font-mono text-[10px] font-medium text-(--ink-1) uppercase"
+								>{activeColor}</span
+							>
 						</div>
-						<span class="text-[9px] text-(--ink-3)">Custom</span>
+						<span class="text-[9px] font-medium tracking-wider text-[#6366f1] uppercase"
+							>Custom</span
+						>
 					</div>
 				{/if}
 			</div>
 
-			<!-- 2. FILL COLOR & PATTERN SECTION -->
+			<!-- 2. BACKGROUND / FILL SECTION -->
 			{#if showFillControls}
-				<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div
 						class="flex items-center justify-between text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase"
 					>
-						<span>Fill / Background</span>
+						<span>Background</span>
 						<span class="font-mono text-[9px] text-(--ink-2)">{activeFillColor}</span>
 					</div>
 
-					<div class="grid grid-cols-6 gap-1.5">
+					<div class="grid grid-cols-6 justify-items-center gap-1.5">
 						{#each FILL_COLORS as fc}
 							<button
 								onclick={() => setFillColor(fc.value)}
-								class="flex h-5 w-5 items-center justify-center rounded-full transition-transform focus:outline-none {activeFillColor.toLowerCase() ===
+								class="group relative flex h-6 w-6 items-center justify-center overflow-hidden rounded-lg border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeFillColor.toLowerCase() ===
 								fc.value.toLowerCase()
-									? 'scale-110 ring-2 ring-[#6366f1]'
-									: 'hover:scale-105'} {fc.value === 'transparent'
-									? 'border border-(--surface-2) bg-transparent'
+									? 'scale-105 ring-2 ring-[#6366f1] ring-offset-2 ring-offset-(--surface-1)'
+									: ''} {fc.value === 'transparent'
+									? 'border border-(--surface-3) bg-(--surface-0)'
 									: ''}"
 								style={fc.value !== 'transparent' ? `background-color: ${fc.value};` : ''}
 								title={fc.label}
 								aria-label="{fc.label} fill color"
 							>
 								{#if fc.value === 'transparent'}
-									<span class="h-[1px] w-3.5 rotate-45 bg-rose-400"></span>
+									<span class="h-[1.5px] w-6 rotate-45 bg-rose-500"></span>
 								{:else if activeFillColor.toLowerCase() === fc.value.toLowerCase()}
-									<span class="h-1.5 w-1.5 rounded-full bg-black/50"></span>
+									<span
+										class="h-1.5 w-1.5 rounded-full {fc.value === '#ffffff' ||
+										fc.value.startsWith('#f')
+											? 'bg-black'
+											: 'bg-white'}"
+									></span>
 								{/if}
 							</button>
 						{/each}
 
 						<!-- Custom Fill Color Picker Button -->
 						<label
-							class="relative flex h-5 w-5 cursor-pointer items-center justify-center rounded-full border border-dashed border-(--ink-3) transition-transform focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1]"
-							title="Custom Fill Color"
+							class="relative flex h-6 w-6 cursor-pointer items-center justify-center rounded-lg border border-dashed border-(--surface-3) bg-(--surface-2)/40 transition-all focus-within:ring-2 focus-within:ring-[#6366f1] hover:scale-110 hover:border-[#6366f1] hover:bg-(--surface-2)"
+							title="Custom fill color"
 							aria-label="Custom fill color"
 						>
 							<input
@@ -580,11 +733,11 @@
 								class="absolute inset-0 h-full w-full cursor-pointer opacity-0"
 							/>
 							<svg
-								class="h-3 w-3 text-(--ink-2)"
+								class="h-3.5 w-3.5 text-(--ink-2)"
 								viewBox="0 0 24 24"
 								fill="none"
 								stroke="currentColor"
-								stroke-width="2"
+								stroke-width="2.5"
 							>
 								<line x1="12" y1="5" x2="12" y2="19" />
 								<line x1="5" y1="12" x2="19" y2="12" />
@@ -594,32 +747,38 @@
 
 					{#if isCustomFillColor}
 						<div
-							class="mt-1 flex items-center justify-between rounded-lg bg-(--surface-2)/60 px-2 py-0.5"
+							class="mt-1 flex items-center justify-between rounded-lg border border-(--surface-2) bg-(--surface-0)/70 px-2 py-1"
 						>
 							<div class="flex items-center gap-1.5">
 								<span
-									class="h-2.5 w-2.5 rounded-full border border-white/20"
+									class="h-3 w-3 rounded-full border border-white/20 shadow-xs"
 									style="background-color: {activeFillColor};"
 								></span>
-								<span class="font-mono text-[10px] text-(--ink-1) uppercase">{activeFillColor}</span
+								<span class="font-mono text-[10px] font-medium text-(--ink-1) uppercase"
+									>{activeFillColor}</span
 								>
 							</div>
-							<span class="text-[9px] text-(--ink-3)">Custom</span>
+							<span class="text-[9px] font-medium tracking-wider text-[#6366f1] uppercase"
+								>Custom</span
+							>
 						</div>
 					{/if}
 
-					<!-- Fill Style Patterns -->
+					<!-- Fill Style Segmented Control -->
 					<div class="pt-1">
-						<div class="mb-1 text-[9px] font-medium text-(--ink-3) uppercase">Pattern</div>
-						<div class="grid grid-cols-3 gap-1">
+						<div class="mb-1 text-[9px] font-medium text-(--ink-3) uppercase">Fill Pattern</div>
+						<div
+							class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+						>
 							{#each FILL_STYLES as fs}
 								<button
 									onclick={() => setFillStyle(fs.value)}
-									class="flex items-center justify-center gap-1 rounded-lg py-1 text-xs transition-colors focus:outline-none {activeFillStyle ===
+									class="flex flex-1 items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium transition-all {activeFillStyle ===
 									fs.value
-										? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-										: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+										? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+										: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
 									title="{fs.label} pattern"
+									aria-label="{fs.label} pattern"
 								>
 									{#if fs.value === 'solid'}
 										<span class="h-2.5 w-2.5 rounded-xs bg-current"></span>
@@ -657,111 +816,120 @@
 				</div>
 			{/if}
 
-			<!-- 3. STROKE WIDTH & STROKE STYLE SECTION -->
+			<!-- 3. STROKE WIDTH SECTION -->
 			{#if showStrokeWidth}
-				<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
 						Stroke Width
 					</div>
-					<div class="grid grid-cols-3 gap-1">
+					<div
+						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					>
 						{#each STROKE_WIDTHS as sw}
 							<button
 								onclick={() => setWidth(sw.value)}
-								class="flex flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-xs transition-colors focus:outline-none {activeWidth ===
+								class="flex flex-1 flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-xs font-medium transition-all {activeWidth ===
 								sw.value
-									? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-								title="{sw.label} stroke width ({sw.value}px)"
+									? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+									: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+								title="{sw.label} ({sw.value}px)"
 								aria-label="{sw.label} stroke width"
 							>
 								<span
-									class="w-6 rounded-full bg-current"
-									style="height: {sw.value <= 2 ? 1.5 : sw.value <= 4 ? 3 : 5}px;"
+									class="w-6 rounded-full bg-current transition-all"
+									style="height: {sw.barHeight}px;"
 								></span>
 								<span class="text-[9px]">{sw.label}</span>
 							</button>
 						{/each}
 					</div>
+				</div>
 
-					<div class="pt-1">
-						<div class="mb-1 text-[9px] font-medium text-(--ink-3) uppercase">Stroke Style</div>
-						<div class="grid grid-cols-3 gap-1">
-							<button
-								onclick={() => setStrokeStyle('solid')}
-								class="flex items-center justify-center rounded-lg py-1.5 text-xs transition-colors focus:outline-none {activeStrokeStyle ===
-								'solid'
-									? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-								title="Solid stroke"
-								aria-label="Solid stroke"
+				<!-- 4. STROKE STYLE SECTION -->
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
+					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
+						Stroke Style
+					</div>
+					<div
+						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					>
+						<button
+							onclick={() => setStrokeStyle('solid')}
+							class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
+							'solid'
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+							title="Solid stroke"
+							aria-label="Solid stroke"
+						>
+							<svg
+								class="h-3.5 w-8"
+								viewBox="0 0 32 8"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
 							>
-								<svg
-									class="h-3.5 w-7"
-									viewBox="0 0 28 8"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-								>
-									<line x1="1" y1="4" x2="27" y2="4" />
-								</svg>
-							</button>
-							<button
-								onclick={() => setStrokeStyle('dashed')}
-								class="flex items-center justify-center rounded-lg py-1.5 text-xs transition-colors focus:outline-none {activeStrokeStyle ===
-								'dashed'
-									? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-								title="Dashed stroke"
-								aria-label="Dashed stroke"
+								<line x1="2" y1="4" x2="30" y2="4" />
+							</svg>
+						</button>
+						<button
+							onclick={() => setStrokeStyle('dashed')}
+							class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
+							'dashed'
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+							title="Dashed stroke"
+							aria-label="Dashed stroke"
+						>
+							<svg
+								class="h-3.5 w-8"
+								viewBox="0 0 32 8"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-dasharray="5 3"
 							>
-								<svg
-									class="h-3.5 w-7"
-									viewBox="0 0 28 8"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-dasharray="5 3"
-								>
-									<line x1="1" y1="4" x2="27" y2="4" />
-								</svg>
-							</button>
-							<button
-								onclick={() => setStrokeStyle('dotted')}
-								class="flex items-center justify-center rounded-lg py-1.5 text-xs transition-colors focus:outline-none {activeStrokeStyle ===
-								'dotted'
-									? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-								title="Dotted stroke"
-								aria-label="Dotted stroke"
+								<line x1="2" y1="4" x2="30" y2="4" />
+							</svg>
+						</button>
+						<button
+							onclick={() => setStrokeStyle('dotted')}
+							class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeStrokeStyle ===
+							'dotted'
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+							title="Dotted stroke"
+							aria-label="Dotted stroke"
+						>
+							<svg
+								class="h-3.5 w-8"
+								viewBox="0 0 32 8"
+								fill="none"
+								stroke="currentColor"
+								stroke-width="2"
+								stroke-dasharray="2 3"
+								stroke-linecap="round"
 							>
-								<svg
-									class="h-3.5 w-7"
-									viewBox="0 0 28 8"
-									fill="none"
-									stroke="currentColor"
-									stroke-width="2"
-									stroke-dasharray="2 3"
-									stroke-linecap="round"
-								>
-									<line x1="1" y1="4" x2="27" y2="4" />
-								</svg>
-							</button>
-						</div>
+								<line x1="2" y1="4" x2="30" y2="4" />
+							</svg>
+						</button>
 					</div>
 				</div>
 			{/if}
 
-			<!-- 4. CORNER ROUNDNESS SECTION (Rectangles) -->
+			<!-- 5. CORNERS (ROUNDNESS) SECTION -->
 			{#if isRectActive}
-				<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">Edges</div>
-					<div class="grid grid-cols-2 gap-1">
+					<div
+						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					>
 						<button
 							onclick={() => setRoundness('sharp')}
-							class="flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs transition-colors focus:outline-none {activeRoundness ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeRoundness ===
 							'sharp'
-								? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-								: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
 							title="Sharp corners (90°)"
 							aria-label="Sharp corners"
 						>
@@ -778,10 +946,10 @@
 						</button>
 						<button
 							onclick={() => setRoundness('round')}
-							class="flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs transition-colors focus:outline-none {activeRoundness ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeRoundness ===
 							'round'
-								? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-								: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
 							title="Rounded corners"
 							aria-label="Rounded corners"
 						>
@@ -800,20 +968,22 @@
 				</div>
 			{/if}
 
-			<!-- 5. ARROW ROUTING SECTION -->
+			<!-- 6. ARROW ROUTING SECTION -->
 			{#if isArrowActive}
-				<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
 						Arrow Routing
 					</div>
-					<div class="grid grid-cols-2 gap-1">
+					<div
+						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					>
 						<button
 							onclick={() => setArrowRouting('orthogonal')}
-							class="flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs transition-colors focus:outline-none {activeArrowRouting ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeArrowRouting ===
 							'orthogonal'
-								? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-								: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-							title="Elbow / Orthogonal (90° step arrow)"
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+							title="Elbow (90° step arrow)"
 							aria-label="Elbow arrow routing"
 						>
 							<svg
@@ -830,11 +1000,11 @@
 						</button>
 						<button
 							onclick={() => setArrowRouting('straight')}
-							class="flex items-center justify-center gap-1.5 rounded-lg py-1 text-xs transition-colors focus:outline-none {activeArrowRouting ===
+							class="flex flex-1 items-center justify-center gap-1.5 rounded-lg py-1.5 text-xs font-medium transition-all {activeArrowRouting ===
 							'straight'
-								? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-								: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-							title="Straight line arrow"
+								? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+							title="Straight arrow"
 							aria-label="Straight arrow routing"
 						>
 							<svg
@@ -853,33 +1023,37 @@
 				</div>
 			{/if}
 
-			<!-- 6. TYPOGRAPHY SECTION -->
+			<!-- 7. TYPOGRAPHY SECTION -->
 			{#if isTextActive}
-				<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">Font</div>
-					<div class="grid grid-cols-3 gap-1">
+					<div
+						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					>
 						{#each FONT_FAMILY_OPTIONS as f}
 							<button
 								onclick={() => setFontFamily(f.value)}
-								class="rounded-lg py-1 text-xs transition-colors focus:outline-none {activeFontFamily ===
+								class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeFontFamily ===
 								f.value
-									? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
-								title="{f.label} font family"
+									? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+									: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
+								title="{f.label} font"
 								style="font-family: {f.css};"
 							>
 								{f.label}
 							</button>
 						{/each}
 					</div>
-					<div class="grid grid-cols-4 gap-1 pt-0.5">
+					<div
+						class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+					>
 						{#each FONT_SIZES as s}
 							<button
 								onclick={() => setFontSize(s.value)}
-								class="rounded-lg py-1 text-xs transition-colors focus:outline-none {activeFontSize ===
+								class="flex flex-1 items-center justify-center rounded-lg py-1.5 text-xs font-medium transition-all {activeFontSize ===
 								s.value
-									? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
-									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+									? 'border border-white/5 bg-(--surface-2) text-(--ink-1) shadow-xs'
+									: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
 								title={s.title}
 							>
 								{s.label}
@@ -889,13 +1063,15 @@
 				</div>
 			{/if}
 
-			<!-- 7. OPACITY SECTION -->
-			<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+			<!-- 8. OPACITY SECTION -->
+			<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 				<div
 					class="flex items-center justify-between text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase"
 				>
 					<span>Opacity</span>
-					<span class="font-mono text-(--ink-1)">{Math.round(activeOpacity * 100)}%</span>
+					<span class="font-mono text-[10px] font-medium text-(--ink-1)"
+						>{Math.round(activeOpacity * 100)}%</span
+					>
 				</div>
 				<input
 					type="range"
@@ -906,15 +1082,17 @@
 					oninput={(e) => setOpacity(Number((e.target as HTMLInputElement).value) / 100)}
 					class="h-1.5 w-full cursor-pointer accent-[#6366f1]"
 				/>
-				<div class="grid grid-cols-4 gap-1">
+				<div
+					class="flex items-center rounded-xl border border-(--surface-2) bg-(--surface-0) p-0.5"
+				>
 					{#each OPACITY_PRESETS as op}
 						<button
 							onclick={() => setOpacity(op.value)}
-							class="rounded-md py-0.5 font-mono text-[10px] transition-colors focus:outline-none {Math.abs(
+							class="flex flex-1 items-center justify-center rounded-lg py-1 font-mono text-[10px] font-medium transition-all {Math.abs(
 								activeOpacity - op.value
 							) < 0.05
-								? 'bg-(--surface-2) font-bold text-(--ink-1) ring-1 ring-[#6366f1]'
-								: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+								? 'border border-white/5 bg-(--surface-2) font-bold text-(--ink-1) shadow-xs'
+								: 'text-(--ink-2) hover:bg-(--surface-2)/40 hover:text-(--ink-1)'}"
 						>
 							{op.label}
 						</button>
@@ -922,9 +1100,9 @@
 				</div>
 			</div>
 
-			<!-- 8. SELECTION ACTIONS SECTION -->
+			<!-- 9. SELECTION ACTIONS SECTION -->
 			{#if selectedCount > 0}
-				<div class="space-y-1.5 border-t border-(--surface-2)/60 pt-2.5">
+				<div class="space-y-1.5 border-t border-(--surface-2)/70 pt-2.5">
 					<div class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
 						Actions
 					</div>
@@ -932,7 +1110,7 @@
 						<!-- Duplicate -->
 						<button
 							onclick={() => engine?.duplicateSelected()}
-							class="flex flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 							title="Duplicate ({selectedCount}) [Ctrl+D / Cmd+D]"
 							aria-label="Duplicate selected items"
 						>
@@ -946,13 +1124,13 @@
 								<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
 								<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
 							</svg>
-							<span class="text-[9px]">Clone</span>
+							<span class="text-[9px] font-medium">Clone</span>
 						</button>
 
 						<!-- Bring to Front -->
 						<button
 							onclick={() => engine?.bringToFront()}
-							class="flex flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 							title="Bring to Front [Ctrl+] / Cmd+]]"
 							aria-label="Bring to front"
 						>
@@ -968,13 +1146,13 @@
 								<polyline points="18 15 12 9 6 15" />
 								<line x1="6" y1="5" x2="18" y2="5" />
 							</svg>
-							<span class="text-[9px]">Front</span>
+							<span class="text-[9px] font-medium">Front</span>
 						</button>
 
 						<!-- Send to Back -->
 						<button
 							onclick={() => engine?.sendToBack()}
-							class="flex flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-(--surface-2) bg-(--surface-0) py-2 text-(--ink-2) transition-all hover:border-(--surface-3) hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
 							title="Send to Back [Ctrl+[ / Cmd+[]"
 							aria-label="Send to back"
 						>
@@ -990,13 +1168,13 @@
 								<polyline points="6 9 12 15 18 9" />
 								<line x1="6" y1="19" x2="18" y2="19" />
 							</svg>
-							<span class="text-[9px]">Back</span>
+							<span class="text-[9px] font-medium">Back</span>
 						</button>
 
 						<!-- Delete -->
 						<button
 							onclick={handleDelete}
-							class="flex flex-col items-center justify-center gap-1 rounded-lg py-1.5 text-rose-400 transition-colors hover:bg-(--surface-2) hover:text-rose-300 focus:outline-none"
+							class="flex flex-col items-center justify-center gap-1 rounded-xl border border-rose-500/20 bg-(--surface-0) py-2 text-rose-400 transition-all hover:border-rose-500/40 hover:bg-rose-500/10 hover:text-rose-300 focus:outline-none"
 							title="Delete Selection ({selectedCount}) [Del/Backspace]"
 							aria-label="Delete selected items"
 						>
@@ -1011,7 +1189,7 @@
 								<path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
 								<path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
 							</svg>
-							<span class="text-[9px]">Delete</span>
+							<span class="text-[9px] font-medium">Delete</span>
 						</button>
 					</div>
 				</div>
