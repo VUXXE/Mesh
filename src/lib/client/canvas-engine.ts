@@ -788,7 +788,53 @@ export class CanvasEngine implements InteractionHost {
 		return newShapes;
 	}
 
+	pastePlainText(text: string): ShapeRecord | null {
+		const trimmed = text.trim();
+		if (!trimmed) return null;
+
+		const viewportW =
+			typeof window !== 'undefined' ? window.innerWidth : this.overlayCanvas?.width || 1920;
+		const viewportH =
+			typeof window !== 'undefined' ? window.innerHeight : this.overlayCanvas?.height || 1080;
+
+		const centerX = (viewportW / 2 - this.viewport.panX) / this.viewport.zoom;
+		const centerY = (viewportH / 2 - this.viewport.panY) / this.viewport.zoom;
+
+		const fontSize = this.fontSize || 18;
+		const fontFamily = this.fontFamily || 'sans';
+		const bounds = this.calculateTextBounds(trimmed, fontSize, fontFamily);
+
+		const shape: ShapeRecord = {
+			id: generateShapeId(),
+			type: 'text',
+			x: Math.round(centerX - bounds.width / 2),
+			y: Math.round(centerY - bounds.height / 2),
+			width: bounds.width,
+			height: bounds.height,
+			fill: 'transparent',
+			stroke: this.strokeColor,
+			strokeWidth: 1,
+			rotation: 0,
+			zIndex: this.getNextZIndex(),
+			data: { text: trimmed, fontSize, fontFamily },
+			createdBy: '',
+			updatedAt: Date.now()
+		};
+
+		this.shapes.set(shape.id, shape);
+		this.setSelectedIds([shape.id]);
+		this.renderBuffer();
+		this.renderOverlay();
+		this.onShapesMutated?.([shape]);
+		this.onActionRecorded?.({ type: 'create', shape });
+		return shape;
+	}
+
 	async paste(): Promise<ShapeRecord[]> {
+		if (this.clipboard.length > 0) {
+			return this.pasteShapes(this.clipboard);
+		}
+
 		if (typeof navigator !== 'undefined' && navigator.clipboard?.readText) {
 			try {
 				const text = await navigator.clipboard.readText();
@@ -802,14 +848,14 @@ export class CanvasEngine implements InteractionHost {
 					) {
 						return this.pasteShapes(parsed.shapes);
 					}
+					if (typeof text === 'string' && text.trim()) {
+						const created = this.pastePlainText(text);
+						return created ? [created] : [];
+					}
 				}
 			} catch {
-				// Fall through to internal clipboard on read failure / rejection
+				// Fall through on read failure / rejection
 			}
-		}
-
-		if (this.clipboard.length > 0) {
-			return this.pasteShapes(this.clipboard);
 		}
 
 		return [];
