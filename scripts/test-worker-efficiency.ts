@@ -64,7 +64,10 @@ console.log('=== Running Worker Efficiency Verification Tests ===');
 		1000
 	) as any;
 
-	console.log('Test 1 - Initial insert with RETURNING returned row:', inserted !== null && inserted.id === 's1');
+	console.log(
+		'Test 1 - Initial insert with RETURNING returned row:',
+		inserted !== null && inserted.id === 's1'
+	);
 	if (!inserted || inserted.x !== 10.0) throw new Error('Test 1 failed on initial insert');
 
 	// Newer update (1050 > 1000) should succeed and return updated row
@@ -85,7 +88,10 @@ console.log('=== Running Worker Efficiency Verification Tests ===');
 		1050
 	) as any;
 
-	console.log('Test 1 - Newer update returned updated row:', updated !== null && updated.x === 35.5);
+	console.log(
+		'Test 1 - Newer update returned updated row:',
+		updated !== null && updated.x === 35.5
+	);
 	if (!updated || updated.x !== 35.5) throw new Error('Test 1 failed on newer update');
 
 	// Stale update (900 < 1050) should be dropped by LWW WHERE clause and RETURNING should return null/undefined
@@ -124,7 +130,8 @@ console.log('=== Running Worker Efficiency Verification Tests ===');
 
 	const remaining = db.prepare('SELECT id FROM shapes').all() as any[];
 	console.log('Test 2 - Batch delete remaining count:', remaining.length, 'expected: 1 (s2)');
-	if (remaining.length !== 1 || remaining[0].id !== 's2') throw new Error('Test 2 failed on batch delete');
+	if (remaining.length !== 1 || remaining[0].id !== 's2')
+		throw new Error('Test 2 failed on batch delete');
 }
 
 // Test 3: Float coordinate rounding

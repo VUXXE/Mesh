@@ -143,6 +143,7 @@
 			window.removeEventListener('resize', handleResize);
 			overlayCanvas.removeEventListener('touchstart', preventTouchZoom);
 			overlayCanvas.removeEventListener('touchmove', preventTouchZoom);
+			createdEngine.destroy();
 		};
 	});
 
