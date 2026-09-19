@@ -117,6 +117,8 @@
 					engine?.setTool('arrow');
 				} else if (e.key === 'r' || e.key === 'R') {
 					engine?.setTool('rectangle');
+				} else if (e.key === 'd' || e.key === 'D') {
+					engine?.setTool('diamond');
 				} else if (e.key === 'e' || e.key === 'E') {
 					engine?.setTool('ellipse');
 				} else if (e.key === 't' || e.key === 'T') {
@@ -130,7 +132,14 @@
 				} else if (e.key === 'Enter') {
 					if (selectedIds.length === 1) {
 						const shape = engine?.getShape(selectedIds[0]);
-						if (shape && (shape.type === 'sticky_note' || shape.type === 'text')) {
+						if (
+							shape &&
+							(shape.type === 'sticky_note' ||
+								shape.type === 'text' ||
+								shape.type === 'rectangle' ||
+								shape.type === 'ellipse' ||
+								(shape.type === 'path' && shape.data?.isDiamond))
+						) {
 							e.preventDefault();
 							engine?.startTextEdit(shape);
 						}

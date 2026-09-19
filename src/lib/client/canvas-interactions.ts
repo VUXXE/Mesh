@@ -1,7 +1,9 @@
 import {
 	calculateResizedBounds,
+	findNearestAnchor,
 	getResizeCursor,
 	getResizeHandles,
+	getShapeAnchors,
 	getShapeBounds,
 	hitTestResizeHandles,
 	hitTestShape,
@@ -9,8 +11,10 @@ import {
 	isShapeInsideMarquee,
 	screenToWorld,
 	simplifyRDP,
+	type AnchorSide,
 	type BoundingBox,
-	type ResizeHandle
+	type ResizeHandle,
+	type ShapeAnchor
 } from './math';
 import type { PathPoint, ShapeRecord, ShapeType } from '../types';
 import type { HistoryAction } from './history.svelte';
@@ -78,6 +82,13 @@ export class InteractionController {
 	private dragInitialPositions = new Map<string, { x: number; y: number }>();
 	private dragInitialShapes = new Map<string, ShapeRecord>();
 	private marqueeInitialSelected: string[] = [];
+
+	private activeStartAnchor: { shapeId: string; side: AnchorSide } | null = null;
+	private activeHoverAnchor: ShapeAnchor | null = null;
+
+	getActiveHoverAnchor(): ShapeAnchor | null {
+		return this.activeHoverAnchor;
+	}
 
 	constructor(private host: InteractionHost) {}
 
@@ -167,12 +178,25 @@ export class InteractionController {
 
 		if (this.host.tool === 'line' || this.host.tool === 'arrow') {
 			this.interactionType = 'create_line';
+			const nearest = findNearestAnchor(worldPos, this.host.getShapes().values());
+			if (nearest) {
+				this.startPoint = { x: nearest.x, y: nearest.y };
+				this.currentPoint = { x: nearest.x, y: nearest.y };
+				this.activeStartAnchor = { shapeId: nearest.shapeId, side: nearest.side };
+				this.activeHoverAnchor = nearest;
+			} else {
+				this.startPoint = worldPos;
+				this.currentPoint = worldPos;
+				this.activeStartAnchor = null;
+				this.activeHoverAnchor = null;
+			}
 			this.host.renderOverlay();
 			return;
 		}
 
 		if (
 			this.host.tool === 'rectangle' ||
+			this.host.tool === 'diamond' ||
 			this.host.tool === 'ellipse' ||
 			this.host.tool === 'sticky_note'
 		) {
@@ -267,6 +291,25 @@ export class InteractionController {
 						this.dragInitialShapes.set(id, snapshot);
 					}
 				}
+
+				const selectedSet = new Set(this.host.selectedIds);
+				for (const s of this.host.getShapes().values()) {
+					if (s.type === 'path') {
+						const sId = s.data?.startAnchor?.shapeId;
+						const eId = s.data?.endAnchor?.shapeId;
+						if ((sId && selectedSet.has(sId)) || (eId && selectedSet.has(eId))) {
+							if (!this.dragInitialShapes.has(s.id)) {
+								this.dragInitialShapes.set(s.id, {
+									...s,
+									data: {
+										...s.data,
+										points: (s.data?.points ?? []).map((p: PathPoint) => ({ ...p }))
+									}
+								});
+							}
+						}
+					}
+				}
 			} else {
 				if (!e.shiftKey) {
 					this.host.setSelectedIds([]);
@@ -327,7 +370,16 @@ export class InteractionController {
 
 		if (!this.isInteracting) {
 			this.updateHoverCursor(screenPos);
-			this.host.renderOverlay();
+			if (this.host.tool === 'line' || this.host.tool === 'arrow') {
+				const nearest = findNearestAnchor(worldPos, this.host.getShapes().values());
+				if (nearest !== this.activeHoverAnchor) {
+					this.activeHoverAnchor = nearest;
+					this.host.renderOverlay();
+				}
+			} else if (this.activeHoverAnchor !== null) {
+				this.activeHoverAnchor = null;
+				this.host.renderOverlay();
+			}
 			return;
 		}
 
@@ -372,19 +424,34 @@ export class InteractionController {
 			}
 
 			if (shape.type === 'path') {
-				const initialPoints: PathPoint[] = this.resizeInitialShape.data?.points ?? [];
-				const scaleX =
-					this.resizeInitialShape.width > 0 ? resized.width / this.resizeInitialShape.width : 1;
-				const scaleY =
-					this.resizeInitialShape.height > 0 ? resized.height / this.resizeInitialShape.height : 1;
-				shape.data = {
-					...shape.data,
-					points: initialPoints.map((p) => ({
-						...p,
-						x: resized.x + (p.x - this.resizeInitialShape!.x) * scaleX,
-						y: resized.y + (p.y - this.resizeInitialShape!.y) * scaleY
-					}))
-				};
+				if (shape.data?.isDiamond) {
+					shape.data = {
+						...shape.data,
+						points: [
+							{ x: resized.x + resized.width / 2, y: resized.y },
+							{ x: resized.x + resized.width, y: resized.y + resized.height / 2 },
+							{ x: resized.x + resized.width / 2, y: resized.y + resized.height },
+							{ x: resized.x, y: resized.y + resized.height / 2 },
+							{ x: resized.x + resized.width / 2, y: resized.y }
+						]
+					};
+				} else {
+					const initialPoints: PathPoint[] = this.resizeInitialShape.data?.points ?? [];
+					const scaleX =
+						this.resizeInitialShape.width > 0 ? resized.width / this.resizeInitialShape.width : 1;
+					const scaleY =
+						this.resizeInitialShape.height > 0
+							? resized.height / this.resizeInitialShape.height
+							: 1;
+					shape.data = {
+						...shape.data,
+						points: initialPoints.map((p) => ({
+							...p,
+							x: resized.x + (p.x - this.resizeInitialShape!.x) * scaleX,
+							y: resized.y + (p.y - this.resizeInitialShape!.y) * scaleY
+						}))
+					};
+				}
 			}
 
 			this.host.renderBuffer();
@@ -411,7 +478,24 @@ export class InteractionController {
 			return;
 		}
 
-		if (this.interactionType === 'create_shape' || this.interactionType === 'create_line') {
+		if (this.interactionType === 'create_line') {
+			const nearest = findNearestAnchor(
+				worldPos,
+				this.host.getShapes().values(),
+				this.activeStartAnchor?.shapeId
+			);
+			if (nearest) {
+				this.currentPoint = { x: nearest.x, y: nearest.y };
+				this.activeHoverAnchor = nearest;
+			} else {
+				this.currentPoint = worldPos;
+				this.activeHoverAnchor = null;
+			}
+			this.host.renderOverlay();
+			return;
+		}
+
+		if (this.interactionType === 'create_shape') {
 			this.host.renderOverlay();
 			return;
 		}
@@ -420,6 +504,7 @@ export class InteractionController {
 			const dx = worldPos.x - this.startPoint.x;
 			const dy = worldPos.y - this.startPoint.y;
 
+			const movedIds = new Set<string>();
 			for (const [id, initialPos] of this.dragInitialPositions) {
 				const shape = this.host.getShape(id);
 				if (shape) {
@@ -432,8 +517,11 @@ export class InteractionController {
 							points: initialPoints.map((p) => ({ ...p, x: p.x + dx, y: p.y + dy }))
 						};
 					}
+					movedIds.add(id);
 				}
 			}
+
+			this.updateConnectedArrows(movedIds);
 
 			this.host.renderBuffer();
 			this.host.renderOverlay();
@@ -527,6 +615,16 @@ export class InteractionController {
 				];
 				const bounds = this.calculatePointsBounds(points);
 				const isArrow = this.host.tool === 'arrow';
+				const shapeData: any = { points, isArrow };
+				if (this.activeStartAnchor) {
+					shapeData.startAnchor = this.activeStartAnchor;
+				}
+				if (this.activeHoverAnchor) {
+					shapeData.endAnchor = {
+						shapeId: this.activeHoverAnchor.shapeId,
+						side: this.activeHoverAnchor.side
+					};
+				}
 
 				const shape: ShapeRecord = {
 					id: 'shape_' + Math.random().toString(36).substring(2, 9),
@@ -540,14 +638,17 @@ export class InteractionController {
 					strokeWidth: this.host.strokeWidth,
 					rotation: 0,
 					zIndex: this.host.getNextZIndex(),
-					data: { points, isArrow },
+					data: shapeData,
 					createdBy: '',
 					updatedAt: now
 				};
 
+				this.host.setShape(shape.id, shape);
 				this.host.onShapesMutated?.([shape]);
 				this.host.onActionRecorded?.({ type: 'create', shape });
 			}
+			this.activeStartAnchor = null;
+			this.activeHoverAnchor = null;
 		} else if (this.interactionType === 'create_shape') {
 			let x = Math.min(this.startPoint.x, this.currentPoint.x);
 			let y = Math.min(this.startPoint.y, this.currentPoint.y);
@@ -561,6 +662,18 @@ export class InteractionController {
 				shapeType = 'ellipse';
 				width = Math.max(width, 10);
 				height = Math.max(height, 10);
+			} else if (this.host.tool === 'diamond') {
+				shapeType = 'path';
+				width = Math.max(width, 10);
+				height = Math.max(height, 10);
+				const points: PathPoint[] = [
+					{ x: x + width / 2, y },
+					{ x: x + width, y: y + height / 2 },
+					{ x: x + width / 2, y: y + height },
+					{ x, y: y + height / 2 },
+					{ x: x + width / 2, y }
+				];
+				shapeData = { isDiamond: true, points, text: '' };
 			} else if (this.host.tool === 'sticky_note') {
 				shapeType = 'sticky_note';
 				shapeData = { text: '' };
@@ -609,6 +722,8 @@ export class InteractionController {
 		} else if (this.interactionType === 'drag_selection') {
 			const movedShapes: ShapeRecord[] = [];
 			const beforeShapes: ShapeRecord[] = [];
+			const movedIds = new Set<string>();
+
 			for (const id of this.host.selectedIds) {
 				const shape = this.host.getShape(id);
 				const initial = this.dragInitialShapes.get(id);
@@ -626,8 +741,34 @@ export class InteractionController {
 							: { ...shape };
 					movedShapes.push(moved);
 					beforeShapes.push(initial);
+					movedIds.add(id);
 				}
 			}
+
+			// Also capture any non-selected connected arrows that were moved
+			for (const shape of this.host.getShapes().values()) {
+				if (shape.type !== 'path' || movedIds.has(shape.id)) continue;
+				const startAnchor = shape.data?.startAnchor;
+				const endAnchor = shape.data?.endAnchor;
+				if (
+					(startAnchor && movedIds.has(startAnchor.shapeId)) ||
+					(endAnchor && movedIds.has(endAnchor.shapeId))
+				) {
+					const initial = this.dragInitialShapes.get(shape.id);
+					if (initial) {
+						shape.updatedAt = now;
+						movedShapes.push({
+							...shape,
+							data: {
+								...shape.data,
+								points: (shape.data?.points ?? []).map((p: PathPoint) => ({ ...p }))
+							}
+						});
+						beforeShapes.push(initial);
+					}
+				}
+			}
+
 			if (movedShapes.length > 0) {
 				this.host.onShapesMutated?.(movedShapes);
 				this.host.onActionRecorded?.({
@@ -724,11 +865,69 @@ export class InteractionController {
 		);
 		const hit = sortedShapes.find((s) => hitTestShape(worldPos, s));
 
-		if (hit && (hit.type === 'sticky_note' || hit.type === 'text')) {
+		if (
+			hit &&
+			(hit.type === 'sticky_note' ||
+				hit.type === 'text' ||
+				hit.type === 'rectangle' ||
+				hit.type === 'ellipse' ||
+				(hit.type === 'path' && hit.data?.isDiamond))
+		) {
 			this.isInteracting = false;
 			this.interactionType = null;
 			this.host.setSelectedIds([hit.id]);
 			this.host.startTextEdit(hit);
+		}
+	}
+
+	private updateConnectedArrows(movedShapeIds: Set<string>) {
+		for (const shape of this.host.getShapes().values()) {
+			if (shape.type !== 'path') continue;
+			const startAnchor = shape.data?.startAnchor;
+			const endAnchor = shape.data?.endAnchor;
+			if (!startAnchor && !endAnchor) continue;
+
+			let points = shape.data?.points ? [...shape.data.points] : [];
+			if (points.length < 2) continue;
+
+			let modified = false;
+
+			if (startAnchor && (movedShapeIds.has(startAnchor.shapeId) || movedShapeIds.has(shape.id))) {
+				const startShape = this.host.getShape(startAnchor.shapeId);
+				if (startShape) {
+					const anchors = getShapeAnchors(startShape);
+					const anchor = anchors.find((a) => a.side === startAnchor.side);
+					if (anchor) {
+						points[0] = { ...points[0], x: anchor.x, y: anchor.y };
+						modified = true;
+					}
+				}
+			}
+
+			if (endAnchor && (movedShapeIds.has(endAnchor.shapeId) || movedShapeIds.has(shape.id))) {
+				const endShape = this.host.getShape(endAnchor.shapeId);
+				if (endShape) {
+					const anchors = getShapeAnchors(endShape);
+					const anchor = anchors.find((a) => a.side === endAnchor.side);
+					if (anchor) {
+						const lastIdx = points.length - 1;
+						points[lastIdx] = { ...points[lastIdx], x: anchor.x, y: anchor.y };
+						modified = true;
+					}
+				}
+			}
+
+			if (modified) {
+				const bounds = this.calculatePointsBounds(points);
+				shape.x = bounds.minX;
+				shape.y = bounds.minY;
+				shape.width = bounds.width;
+				shape.height = bounds.height;
+				shape.data = {
+					...shape.data,
+					points
+				};
+			}
 		}
 	}
 

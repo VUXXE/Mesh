@@ -129,7 +129,28 @@ export function exportToSvg(
 	for (const shape of sorted) {
 		if (shape.type === 'path') {
 			const points: PathPoint[] = shape.data?.points ?? [];
-			if (points.length >= 2) {
+			if (shape.data?.isDiamond && points.length >= 4) {
+				const pts = points.map((p) => `${p.x},${p.y}`).join(' ');
+				svgContent += `<polygon points="${pts}" fill="${shape.fill || 'none'}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linejoin="round"/>\n`;
+
+				const text = shape.data?.text || '';
+				if (text) {
+					const fSize = shape.data?.fontSize || 16;
+					const fFamily = getFontFamilySvg(shape.data?.fontFamily || 'sans');
+					const lines = text.split('\n');
+					const cx = shape.x + shape.width / 2;
+					const cy = shape.y + shape.height / 2;
+					const lineHeight = fSize * 1.3;
+					const totalH = lines.length * lineHeight;
+					const startY = cy - totalH / 2 + fSize * 0.8;
+					svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
+					for (let i = 0; i < lines.length; i++) {
+						const dy = i === 0 ? '0' : '1.3em';
+						svgContent += `<tspan x="${cx}" dy="${dy}">${escapeXml(lines[i])}</tspan>\n`;
+					}
+					svgContent += `</text>\n`;
+				}
+			} else if (points.length >= 2) {
 				const d = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
 				svgContent += `<path d="${d}" fill="none" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
 
@@ -152,12 +173,46 @@ export function exportToSvg(
 			const rw = Math.max(Math.abs(shape.width), 1);
 			const rh = Math.max(Math.abs(shape.height), 1);
 			svgContent += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="4" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
+
+			const text = shape.data?.text || '';
+			if (text) {
+				const fSize = shape.data?.fontSize || 16;
+				const fFamily = getFontFamilySvg(shape.data?.fontFamily || 'sans');
+				const lines = text.split('\n');
+				const cx = rx + rw / 2;
+				const cy = ry + rh / 2;
+				const lineHeight = fSize * 1.3;
+				const totalH = lines.length * lineHeight;
+				const startY = cy - totalH / 2 + fSize * 0.8;
+				svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
+				for (let i = 0; i < lines.length; i++) {
+					const dy = i === 0 ? '0' : '1.3em';
+					svgContent += `<tspan x="${cx}" dy="${dy}">${escapeXml(lines[i])}</tspan>\n`;
+				}
+				svgContent += `</text>\n`;
+			}
 		} else if (shape.type === 'ellipse') {
 			const rx = Math.max(Math.abs(shape.width / 2), 1);
 			const ry = Math.max(Math.abs(shape.height / 2), 1);
 			const cx = shape.x + shape.width / 2;
 			const cy = shape.y + shape.height / 2;
 			svgContent += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
+
+			const text = shape.data?.text || '';
+			if (text) {
+				const fSize = shape.data?.fontSize || 16;
+				const fFamily = getFontFamilySvg(shape.data?.fontFamily || 'sans');
+				const lines = text.split('\n');
+				const lineHeight = fSize * 1.3;
+				const totalH = lines.length * lineHeight;
+				const startY = cy - totalH / 2 + fSize * 0.8;
+				svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
+				for (let i = 0; i < lines.length; i++) {
+					const dy = i === 0 ? '0' : '1.3em';
+					svgContent += `<tspan x="${cx}" dy="${dy}">${escapeXml(lines[i])}</tspan>\n`;
+				}
+				svgContent += `</text>\n`;
+			}
 		} else if (shape.type === 'text') {
 			const text = shape.data?.text || '';
 			const fSize = shape.data?.fontSize || 18;

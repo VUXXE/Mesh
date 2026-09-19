@@ -155,7 +155,9 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 	}
 
 	if (shape.type === 'rectangle') {
-		const isFilled = shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none';
+		const isFilled =
+			(shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none') ||
+			Boolean(shape.data?.text?.trim());
 		if (isFilled) {
 			return (
 				point.x >= shape.x - hitPadding &&
@@ -197,7 +199,9 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 		const cx = shape.x + rx;
 		const cy = shape.y + ry;
 
-		const isFilled = shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none';
+		const isFilled =
+			(shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none') ||
+			Boolean(shape.data?.text?.trim());
 		const normalizedX = (point.x - cx) / (rx + hitPadding);
 		const normalizedY = (point.y - cy) / (ry + hitPadding);
 		const inOuter = normalizedX * normalizedX + normalizedY * normalizedY <= 1;
@@ -220,6 +224,15 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 		const points: PathPoint[] = shape.data?.points ?? [];
 		if (points.length < 2) return false;
 
+		if (shape.data?.isDiamond) {
+			const isFilled =
+				(shape.fill && shape.fill !== 'transparent' && shape.fill !== 'none') ||
+				Boolean(shape.data?.text?.trim());
+			if (isFilled && isPointInsidePolygon(point, points)) {
+				return true;
+			}
+		}
+
 		for (let i = 0; i < points.length - 1; i++) {
 			const dist = perpendicularDistance(point, points[i], points[i + 1]);
 			if (dist <= hitPadding) {
@@ -230,6 +243,72 @@ export function hitTestShape(point: { x: number; y: number }, shape: ShapeRecord
 	}
 
 	return false;
+}
+
+export function isPointInsidePolygon(point: { x: number; y: number }, vs: PathPoint[]): boolean {
+	let inside = false;
+	for (let i = 0, j = vs.length - 1; i < vs.length; j = i++) {
+		const xi = vs[i].x;
+		const yi = vs[i].y;
+		const xj = vs[j].x;
+		const yj = vs[j].y;
+		const intersect =
+			yi > point.y !== yj > point.y && point.x < ((xj - xi) * (point.y - yi)) / (yj - yi) + xi;
+		if (intersect) inside = !inside;
+	}
+	return inside;
+}
+
+export type AnchorSide = 'top' | 'right' | 'bottom' | 'left';
+
+export interface ShapeAnchor {
+	shapeId: string;
+	side: AnchorSide;
+	x: number;
+	y: number;
+}
+
+export function getShapeAnchors(shape: ShapeRecord): ShapeAnchor[] {
+	const cx = shape.x + shape.width / 2;
+	const cy = shape.y + shape.height / 2;
+	return [
+		{ shapeId: shape.id, side: 'top', x: cx, y: shape.y },
+		{ shapeId: shape.id, side: 'right', x: shape.x + shape.width, y: cy },
+		{ shapeId: shape.id, side: 'bottom', x: cx, y: shape.y + shape.height },
+		{ shapeId: shape.id, side: 'left', x: shape.x, y: cy }
+	];
+}
+
+export function findNearestAnchor(
+	point: { x: number; y: number },
+	shapes: Iterable<ShapeRecord>,
+	excludeShapeId?: string,
+	maxDistance = 20
+): ShapeAnchor | null {
+	let bestAnchor: ShapeAnchor | null = null;
+	let minDist = maxDistance;
+
+	for (const shape of shapes) {
+		if (shape.id === excludeShapeId) continue;
+		if (
+			shape.type !== 'rectangle' &&
+			shape.type !== 'ellipse' &&
+			shape.type !== 'sticky_note' &&
+			!(shape.type === 'path' && shape.data?.isDiamond)
+		) {
+			continue;
+		}
+
+		for (const anchor of getShapeAnchors(shape)) {
+			const dist = Math.hypot(point.x - anchor.x, point.y - anchor.y);
+			if (dist < minDist) {
+				minDist = dist;
+				bestAnchor = anchor;
+			}
+		}
+	}
+
+	return bestAnchor;
 }
 
 function ccw(

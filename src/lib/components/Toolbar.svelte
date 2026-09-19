@@ -107,6 +107,7 @@
 			activeTool === 'line' ||
 			activeTool === 'arrow' ||
 			activeTool === 'rectangle' ||
+			activeTool === 'diamond' ||
 			activeTool === 'ellipse' ||
 			hasNonTextSelected ||
 			(activeTool === 'select' && selectedCount === 0)
@@ -324,6 +325,21 @@
 			>
 				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<rect x="3" y="3" width="18" height="18" rx="2" />
+				</svg>
+			</button>
+
+			<!-- Diamond (D) -->
+			<button
+				onclick={() => selectTool('diamond')}
+				class="flex items-center justify-center rounded-lg p-2 text-sm transition-all focus:outline-none {activeTool ===
+				'diamond'
+					? 'bg-[#6366f1] text-white'
+					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+				title="Diamond (D)"
+				aria-label="Diamond tool"
+			>
+				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<polygon points="12 2 22 12 12 22 2 12" />
 				</svg>
 			</button>
 

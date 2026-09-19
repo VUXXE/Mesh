@@ -63,6 +63,10 @@ export function drawShape(
 			for (let i = 1; i < points.length; i++) {
 				ctx.lineTo(points[i].x, points[i].y);
 			}
+			if (shape.data?.isDiamond) {
+				ctx.closePath();
+				if (shape.fill && shape.fill !== 'transparent') ctx.fill();
+			}
 			ctx.stroke();
 
 			if (shape.data?.isArrow && points.length >= 2) {
@@ -78,6 +82,10 @@ export function drawShape(
 					shape.strokeWidth || 2
 				);
 			}
+
+			if (shape.data?.isDiamond && (editingShapeId !== shape.id || !isStaticCtx)) {
+				drawShapeCenteredText(ctx, shape, defaultStroke);
+			}
 		}
 	} else if (shape.type === 'rectangle') {
 		ctx.beginPath();
@@ -88,6 +96,10 @@ export function drawShape(
 		ctx.roundRect(rx, ry, rw, rh, 4);
 		if (shape.fill && shape.fill !== 'transparent') ctx.fill();
 		ctx.stroke();
+
+		if (editingShapeId !== shape.id || !isStaticCtx) {
+			drawShapeCenteredText(ctx, shape, defaultStroke);
+		}
 	} else if (shape.type === 'ellipse') {
 		ctx.beginPath();
 		const rx = Math.max(Math.abs(shape.width / 2), 1);
@@ -95,6 +107,10 @@ export function drawShape(
 		ctx.ellipse(shape.x + shape.width / 2, shape.y + shape.height / 2, rx, ry, 0, 0, Math.PI * 2);
 		if (shape.fill && shape.fill !== 'transparent') ctx.fill();
 		ctx.stroke();
+
+		if (editingShapeId !== shape.id || !isStaticCtx) {
+			drawShapeCenteredText(ctx, shape, defaultStroke);
+		}
 	} else if (shape.type === 'text') {
 		// Suppress static text while actively edited to avoid double-rendering under the textarea
 		if (editingShapeId !== shape.id || !isStaticCtx) {
@@ -336,6 +352,15 @@ export function drawShapePreview(
 		ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
 		if (fillColor !== 'transparent') ctx.fill();
 		ctx.stroke();
+	} else if (tool === 'diamond') {
+		ctx.beginPath();
+		ctx.moveTo(x + w / 2, y);
+		ctx.lineTo(x + w, y + h / 2);
+		ctx.lineTo(x + w / 2, y + h);
+		ctx.lineTo(x, y + h / 2);
+		ctx.closePath();
+		if (fillColor !== 'transparent') ctx.fill();
+		ctx.stroke();
 	}
 	ctx.restore();
 }
@@ -410,5 +435,60 @@ export function drawMarqueeBox(
 	ctx.lineWidth = 1 / zoom;
 	ctx.fillRect(minX, minY, w, h);
 	ctx.strokeRect(minX, minY, w, h);
+	ctx.restore();
+}
+
+export function drawAnchorIndicator(
+	ctx: CanvasRenderingContext2D,
+	anchor: { x: number; y: number },
+	zoom: number
+) {
+	ctx.save();
+	const r = Math.max(5 / zoom, 3);
+	// Outer glow ring
+	ctx.beginPath();
+	ctx.arc(anchor.x, anchor.y, r * 1.8, 0, Math.PI * 2);
+	ctx.fillStyle = 'rgba(99, 102, 241, 0.25)';
+	ctx.fill();
+
+	// Inner dot
+	ctx.beginPath();
+	ctx.arc(anchor.x, anchor.y, r, 0, Math.PI * 2);
+	ctx.fillStyle = '#6366f1';
+	ctx.fill();
+	ctx.lineWidth = 1.5 / zoom;
+	ctx.strokeStyle = '#ffffff';
+	ctx.stroke();
+	ctx.restore();
+}
+
+export function drawShapeCenteredText(
+	ctx: CanvasRenderingContext2D,
+	shape: ShapeRecord,
+	defaultStroke: string
+) {
+	const text = shape.data?.text;
+	if (!text) return;
+
+	ctx.save();
+	const fSize = shape.data?.fontSize || 16;
+	const fFamily = getFontFamilyCss(shape.data?.fontFamily || 'sans');
+	ctx.font = `${fSize}px ${fFamily}`;
+	ctx.fillStyle = shape.stroke || defaultStroke;
+	ctx.textAlign = 'center';
+	ctx.textBaseline = 'middle';
+
+	const cx = shape.x + shape.width / 2;
+	const cy = shape.y + shape.height / 2;
+	const maxTextWidth = Math.max(shape.data?.isDiamond ? shape.width * 0.6 : shape.width * 0.85, 20);
+	const lines = wrapText(ctx, text, maxTextWidth);
+	const lineHeight = Math.round(fSize * 1.3);
+	const totalH = lines.length * lineHeight;
+	let curY = cy - totalH / 2 + lineHeight / 2;
+
+	for (const line of lines) {
+		ctx.fillText(line, cx, curY);
+		curY += lineHeight;
+	}
 	ctx.restore();
 }
