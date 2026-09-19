@@ -277,6 +277,7 @@ bun run scripts/test-export-import.ts
 bun run scripts/test-presence-quota.ts
 bun run scripts/test-worker-efficiency.ts
 bun run scripts/test-cursor-interpolation.ts
+bun run scripts/test-marquee-selection.ts
 
 # Run live integration tests (local edge server on :8788 required)
 bun run scripts/test-handshake.ts
