@@ -152,4 +152,53 @@ console.log('=== Running Worker Efficiency Verification Tests ===');
 	if (jsonRounded.length >= jsonRaw.length) throw new Error('Test 3 failed on size compression');
 }
 
+// Test 4: Smart Shape Count Caching & Threshold Recalibration
+{
+	let countQueriesExecuted = 0;
+	let cachedCount: number | null = null;
+	const db = new Database(':memory:');
+	db.exec(`
+		CREATE TABLE shapes (id TEXT PRIMARY KEY, type TEXT);
+		INSERT INTO shapes VALUES ('s1', 'rectangle'), ('s2', 'ellipse');
+	`);
+
+	const queryCountFromDb = (): number => {
+		countQueriesExecuted++;
+		const row = db.prepare('SELECT COUNT(*) as count FROM shapes').get() as { count: number };
+		return row.count;
+	};
+
+	const getShapeCount = (): number => {
+		if (cachedCount === null || cachedCount >= 9000) {
+			cachedCount = queryCountFromDb();
+		}
+		return cachedCount;
+	};
+
+	// Initially null: queries DB once
+	if (getShapeCount() !== 2) throw new Error('Test 4 initial count mismatch');
+	if (countQueriesExecuted !== 1) throw new Error('Test 4 should have queried once');
+
+	// Subsequent calls use cache, 0 extra DB queries
+	if (getShapeCount() !== 2) throw new Error('Test 4 cached count mismatch');
+	if (countQueriesExecuted !== 1) throw new Error('Test 4 should not have queried DB again');
+
+	// Simulate 100 upserts (cachedCount incremented in memory)
+	cachedCount += 100;
+	if (getShapeCount() !== 102) throw new Error('Test 4 count increment mismatch');
+	if (countQueriesExecuted !== 1)
+		throw new Error('Test 4 should not query DB during regular upserts');
+
+	// When crossing 9000 threshold, it auto-recalibrates from DB
+	cachedCount = 9050;
+	const recalibrated = getShapeCount();
+	if (recalibrated !== 2) throw new Error(`Test 4 recalibration failed, got ${recalibrated}`);
+	if (countQueriesExecuted !== 2)
+		throw new Error('Test 4 should have recalibrated by querying DB once');
+
+	console.log(
+		'Test 4 - Smart count caching & threshold recalibration passed (0 queries during normal updates)'
+	);
+}
+
 console.log('=== All Worker Efficiency Tests Passed Successfully! ===');
