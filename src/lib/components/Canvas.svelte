@@ -38,37 +38,59 @@
 	const editBox = $derived.by(() => {
 		if (!editingShape) return null;
 		const isSticky = editingShape.type === 'sticky_note';
+		const isText = editingShape.type === 'text';
+		const isShapeLabel = !isSticky && !isText;
 		const x = viewport.panX + editingShape.x * viewport.zoom;
 		const y = viewport.panY + editingShape.y * viewport.zoom;
 		let width = editingShape.width * viewport.zoom;
 		let height = editingShape.height * viewport.zoom;
 		const fontSize = isSticky
 			? Math.max(14 * viewport.zoom, 10)
-			: Math.max((editingShape.data?.fontSize || 18) * viewport.zoom, 12);
+			: isShapeLabel
+				? Math.max((editingShape.data?.fontSize || 16) * viewport.zoom, 12)
+				: Math.max((editingShape.data?.fontSize || 18) * viewport.zoom, 12);
 		const fontFamily = isSticky
 			? 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
 			: getFontFamilyCss(editingShape.data?.fontFamily || 'sans');
-		const padding = isSticky ? Math.max(12 * viewport.zoom, 8) : 6;
+		const padding = isSticky ? Math.max(12 * viewport.zoom, 8) : isShapeLabel ? 8 : 6;
 
-		if (!isSticky) {
+		let boxX = x;
+		let boxY = y;
+		let boxW = width;
+		let boxH = height;
+
+		if (isText) {
 			const lines = editText.split('\n');
 			const maxLineLength = Math.max(...lines.map((l) => l.length), 1);
 			const computedWidth = (maxLineLength + 2) * fontSize * 0.65;
-			width = Math.max(width, computedWidth, 140 * viewport.zoom);
-			height = Math.max(height, lines.length * fontSize * 1.4 + 12, 36 * viewport.zoom);
+			boxW = Math.max(width, computedWidth, 140 * viewport.zoom);
+			boxH = Math.max(height, lines.length * fontSize * 1.4 + 12, 36 * viewport.zoom);
+		} else if (isShapeLabel) {
+			const isDiamond = editingShape.data?.isDiamond;
+			const maxW = isDiamond ? width * 0.65 : width * 0.85;
+			const maxH = isDiamond ? height * 0.65 : height * 0.85;
+			boxW = Math.max(maxW, 80);
+			boxH = Math.max(maxH, 36);
+			boxX = x + (width - boxW) / 2;
+			boxY = y + (height - boxH) / 2;
 		}
 
 		return {
-			x,
-			y,
-			width,
-			height,
+			x: boxX,
+			y: boxY,
+			width: boxW,
+			height: boxH,
 			fontSize,
 			fontFamily,
 			padding,
 			isSticky,
+			isShapeLabel,
 			color: isSticky ? '#18181b' : editingShape.stroke || 'var(--ink-1)',
-			bg: isSticky ? '#fef08a' : 'color-mix(in srgb, var(--surface-1) 90%, transparent)',
+			bg: isSticky
+				? '#fef08a'
+				: isShapeLabel
+					? 'rgba(15, 23, 42, 0.75)'
+					: 'color-mix(in srgb, var(--surface-1) 90%, transparent)',
 			borderColor: isSticky ? '#eab308' : '#6366f1'
 		};
 	});
@@ -303,10 +325,14 @@
 			onpointerdown={(e) => e.stopPropagation()}
 			onpointerup={(e) => e.stopPropagation()}
 			onclick={(e) => e.stopPropagation()}
-			placeholder={editBox.isSticky ? 'Type a note...' : 'Type text...'}
+			placeholder={editBox.isSticky
+				? 'Type a note...'
+				: editBox.isShapeLabel
+					? 'Type label...'
+					: 'Type text...'}
 			style="position: absolute; left: {editBox.x}px; top: {editBox.y}px; width: {Math.max(
 				editBox.width,
-				editBox.isSticky ? 80 : 140
+				editBox.isSticky ? 80 : editBox.isShapeLabel ? 80 : 140
 			)}px; height: {Math.max(
 				editBox.height,
 				editBox.isSticky ? 80 : 32
@@ -314,7 +340,9 @@
 				? '#18181b'
 				: '#6366f1'}; background: {editBox.bg}; border: 1px solid {editBox.borderColor}; border-radius: {editBox.isSticky
 				? '6px'
-				: '4px'}; line-height: 1.3; font-family: {editBox.fontFamily}; resize: none; z-index: 30; outline: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
+				: '4px'}; line-height: 1.3; font-family: {editBox.fontFamily}; text-align: {editBox.isShapeLabel
+				? 'center'
+				: 'left'}; resize: none; z-index: 30; outline: none; box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);"
 			class="overflow-auto select-text"></textarea>
 	{/if}
 

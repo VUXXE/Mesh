@@ -9,6 +9,7 @@ import {
 } from './canvas-text';
 import {
 	drawActiveStroke,
+	drawAnchorIndicator,
 	drawArrowHead,
 	drawLinePreview,
 	drawMarqueeBox,
@@ -39,12 +40,14 @@ export {
 } from './canvas-text';
 export {
 	drawActiveStroke,
+	drawAnchorIndicator,
 	drawArrowHead,
 	drawLinePreview,
 	drawMarqueeBox,
 	drawPeerCursor,
 	drawSelectionOutline,
 	drawShape,
+	drawShapeCenteredText,
 	drawShapePreview,
 	renderGrid
 } from './canvas-render';
@@ -59,7 +62,16 @@ export {
 export { InteractionController, type InteractionHost } from './canvas-interactions';
 
 export type ToolMode =
-	'select' | 'pen' | 'line' | 'arrow' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note' | 'pan';
+	| 'select'
+	| 'pen'
+	| 'line'
+	| 'arrow'
+	| 'rectangle'
+	| 'diamond'
+	| 'ellipse'
+	| 'text'
+	| 'sticky_note'
+	| 'pan';
 
 export interface ViewportState {
 	panX: number;
@@ -1163,6 +1175,11 @@ export class CanvasEngine implements InteractionHost {
 			);
 		} else if (interactionType === 'marquee') {
 			drawMarqueeBox(ctx, startPoint, currentPoint, this.viewport.zoom);
+		}
+
+		const hoverAnchor = this.interactions.getActiveHoverAnchor();
+		if (hoverAnchor) {
+			drawAnchorIndicator(ctx, hoverAnchor, this.viewport.zoom);
 		}
 
 		drawSelectionOutline(
