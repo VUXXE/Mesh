@@ -36,6 +36,62 @@ interface PeerAttachment {
 const MIN_PASSWORD_LENGTH = 4;
 const MAX_PASSWORD_LENGTH = 128;
 const VALID_SHAPE_TYPES = new Set(['path', 'rectangle', 'ellipse', 'text', 'sticky_note']);
+const MAX_SHAPES_PER_ROOM = 10000;
+const SHAPE_COUNT_RECALIBRATE_THRESHOLD = 9000;
+
+const INIT_SCHEMA_SQL = `
+	CREATE TABLE IF NOT EXISTS shapes (
+		id TEXT PRIMARY KEY NOT NULL,
+		type TEXT NOT NULL CHECK(type IN ('path', 'rectangle', 'ellipse', 'text', 'sticky_note')),
+		x REAL NOT NULL DEFAULT 0.0,
+		y REAL NOT NULL DEFAULT 0.0,
+		width REAL DEFAULT 0.0,
+		height REAL DEFAULT 0.0,
+		fill TEXT DEFAULT 'transparent',
+		stroke TEXT DEFAULT '#000000',
+		stroke_width REAL DEFAULT 2.0,
+		rotation REAL DEFAULT 0.0,
+		z_index INTEGER DEFAULT 0,
+		data TEXT,
+		created_by TEXT NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
+	CREATE INDEX IF NOT EXISTS idx_shapes_z_index ON shapes(z_index ASC);
+	CREATE INDEX IF NOT EXISTS idx_shapes_updated ON shapes(updated_at DESC);
+	CREATE TABLE IF NOT EXISTS room_meta (
+		key TEXT PRIMARY KEY NOT NULL,
+		value TEXT NOT NULL
+	);
+`;
+
+const UPSERT_SHAPE_SQL = `
+	INSERT INTO shapes (
+		id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at
+	) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	ON CONFLICT(id) DO UPDATE SET
+		x = excluded.x,
+		y = excluded.y,
+		width = excluded.width,
+		height = excluded.height,
+		fill = excluded.fill,
+		stroke = excluded.stroke,
+		stroke_width = excluded.stroke_width,
+		rotation = excluded.rotation,
+		z_index = excluded.z_index,
+		data = excluded.data,
+		updated_at = excluded.updated_at
+	WHERE excluded.updated_at >= shapes.updated_at
+	RETURNING id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at;
+`;
+
+const SELECT_ALL_SHAPES_SQL =
+	'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes ORDER BY z_index ASC';
+
+const COUNT_SHAPES_SQL = 'SELECT COUNT(*) as count FROM shapes';
+const DELETE_ALL_SHAPES_SQL = 'DELETE FROM shapes';
+const SELECT_META_SQL = 'SELECT value FROM room_meta WHERE key = ?';
+const UPSERT_META_SQL =
+	'INSERT INTO room_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value';
 
 export class WhiteboardRoom extends DurableObject {
 	private metaCache = new Map<string, string | null>();
@@ -47,30 +103,7 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	private initSchema() {
-		this.ctx.storage.sql.exec(`
-			CREATE TABLE IF NOT EXISTS shapes (
-				id TEXT PRIMARY KEY NOT NULL,
-				type TEXT NOT NULL CHECK(type IN ('path', 'rectangle', 'ellipse', 'text', 'sticky_note')),
-				x REAL NOT NULL DEFAULT 0.0,
-				y REAL NOT NULL DEFAULT 0.0,
-				width REAL DEFAULT 0.0,
-				height REAL DEFAULT 0.0,
-				fill TEXT DEFAULT 'transparent',
-				stroke TEXT DEFAULT '#000000',
-				stroke_width REAL DEFAULT 2.0,
-				rotation REAL DEFAULT 0.0,
-				z_index INTEGER DEFAULT 0,
-				data TEXT,
-				created_by TEXT NOT NULL,
-				updated_at INTEGER NOT NULL
-			);
-			CREATE INDEX IF NOT EXISTS idx_shapes_z_index ON shapes(z_index ASC);
-			CREATE INDEX IF NOT EXISTS idx_shapes_updated ON shapes(updated_at DESC);
-			CREATE TABLE IF NOT EXISTS room_meta (
-				key TEXT PRIMARY KEY NOT NULL,
-				value TEXT NOT NULL
-			);
-		`);
+		this.ctx.storage.sql.exec(INIT_SCHEMA_SQL);
 	}
 
 	async fetch(request: Request): Promise<Response> {
@@ -298,10 +331,11 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	private getShapeCount(): number {
-		if (this.cachedShapeCount === null) {
-			const row = this.ctx.storage.sql
-				.exec<{ count: number }>('SELECT COUNT(*) as count FROM shapes')
-				.one();
+		if (
+			this.cachedShapeCount === null ||
+			this.cachedShapeCount >= SHAPE_COUNT_RECALIBRATE_THRESHOLD
+		) {
+			const row = this.ctx.storage.sql.exec<{ count: number }>(COUNT_SHAPES_SQL).one();
 			this.cachedShapeCount = row?.count ?? 0;
 		}
 		return this.cachedShapeCount;
@@ -319,32 +353,12 @@ export class WhiteboardRoom extends DurableObject {
 			return;
 		}
 
-		if (this.getShapeCount() >= 10000) {
+		if (this.getShapeCount() >= MAX_SHAPES_PER_ROOM) {
 			return;
 		}
 
 		const senderAttachment = ws.deserializeAttachment() as PeerAttachment | null;
 		const senderUserId = senderAttachment?.userId ?? 'anonymous';
-
-		const upsertStmt = `
-			INSERT INTO shapes (
-				id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT(id) DO UPDATE SET
-				x = excluded.x,
-				y = excluded.y,
-				width = excluded.width,
-				height = excluded.height,
-				fill = excluded.fill,
-				stroke = excluded.stroke,
-				stroke_width = excluded.stroke_width,
-				rotation = excluded.rotation,
-				z_index = excluded.z_index,
-				data = excluded.data,
-				updated_at = excluded.updated_at
-			WHERE excluded.updated_at >= shapes.updated_at
-			RETURNING id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at;
-		`;
 
 		const appliedShapes: ShapeRecord[] = [];
 		const now = Date.now();
@@ -372,7 +386,7 @@ export class WhiteboardRoom extends DurableObject {
 
 					const updatedRow = this.ctx.storage.sql
 						.exec<RawShapeRow>(
-							upsertStmt,
+							UPSERT_SHAPE_SQL,
 							s.id,
 							s.type,
 							Number.isFinite(s.x) ? s.x : 0.0,
@@ -401,7 +415,9 @@ export class WhiteboardRoom extends DurableObject {
 		}
 
 		if (appliedShapes.length > 0) {
-			this.cachedShapeCount = null;
+			if (this.cachedShapeCount !== null) {
+				this.cachedShapeCount += appliedShapes.length;
+			}
 			const broadcastMsg: S2CMessage = {
 				type: 'shapes:upserted',
 				shapes: appliedShapes
@@ -451,7 +467,7 @@ export class WhiteboardRoom extends DurableObject {
 		}
 
 		try {
-			this.ctx.storage.sql.exec('DELETE FROM shapes');
+			this.ctx.storage.sql.exec(DELETE_ALL_SHAPES_SQL);
 			this.cachedShapeCount = 0;
 		} catch (err) {
 			console.error('Failed to clear canvas:', err);
@@ -498,9 +514,7 @@ export class WhiteboardRoom extends DurableObject {
 		if (this.metaCache.has(key)) {
 			return this.metaCache.get(key) ?? null;
 		}
-		const rows = this.ctx.storage.sql
-			.exec<{ value: string }>('SELECT value FROM room_meta WHERE key = ?', key)
-			.toArray();
+		const rows = this.ctx.storage.sql.exec<{ value: string }>(SELECT_META_SQL, key).toArray();
 		const val = rows[0]?.value ?? null;
 		this.metaCache.set(key, val);
 		return val;
@@ -508,11 +522,7 @@ export class WhiteboardRoom extends DurableObject {
 
 	private setMeta(key: string, value: string): void {
 		this.metaCache.set(key, value);
-		this.ctx.storage.sql.exec(
-			'INSERT INTO room_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-			key,
-			value
-		);
+		this.ctx.storage.sql.exec(UPSERT_META_SQL, key, value);
 	}
 
 	private hasPassword(): boolean {
@@ -629,11 +639,9 @@ export class WhiteboardRoom extends DurableObject {
 	}
 
 	private getAllShapes(): ShapeRecord[] {
-		const rows = this.ctx.storage.sql
-			.exec<RawShapeRow>(
-				'SELECT id, type, x, y, width, height, fill, stroke, stroke_width, rotation, z_index, data, created_by, updated_at FROM shapes ORDER BY z_index ASC'
-			)
-			.toArray();
+		const rows = this.ctx.storage.sql.exec<RawShapeRow>(SELECT_ALL_SHAPES_SQL).toArray();
+
+		this.cachedShapeCount = rows.length;
 
 		return rows.map((r) => this.rowToShape(r));
 	}
