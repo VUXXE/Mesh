@@ -632,3 +632,255 @@ export function calculateResizedBounds(options: ResizeBoundsOptions): {
 		}
 	}
 }
+
+/**
+ * Calculates a clean orthogonal (90° elbow) polyline path between start and end.
+ * If startSide and endSide are provided (e.g. from shape anchors), it respects exit and entry directions.
+ */
+export function calculateOrthogonalPath(
+	start: { x: number; y: number },
+	end: { x: number; y: number },
+	startSide?: AnchorSide,
+	endSide?: AnchorSide
+): PathPoint[] {
+	const p0 = { x: start.x, y: start.y, pressure: 0.5 };
+	const pEnd = { x: end.x, y: end.y, pressure: 0.5 };
+
+	if (Math.hypot(end.x - start.x, end.y - start.y) < 10) {
+		return [p0, pEnd];
+	}
+
+	const rawPoints: { x: number; y: number }[] = [p0];
+
+	if (startSide && endSide) {
+		if (startSide === 'right' && endSide === 'left') {
+			if (start.x < end.x - 20) {
+				const midX = Math.round((start.x + end.x) / 2);
+				rawPoints.push({ x: midX, y: start.y }, { x: midX, y: end.y });
+			} else {
+				const midY =
+					Math.abs(start.y - end.y) < 30
+						? Math.max(start.y, end.y) + 40
+						: Math.round((start.y + end.y) / 2);
+				rawPoints.push(
+					{ x: start.x + 25, y: start.y },
+					{ x: start.x + 25, y: midY },
+					{ x: end.x - 25, y: midY },
+					{ x: end.x - 25, y: end.y }
+				);
+			}
+		} else if (startSide === 'left' && endSide === 'right') {
+			if (start.x > end.x + 20) {
+				const midX = Math.round((start.x + end.x) / 2);
+				rawPoints.push({ x: midX, y: start.y }, { x: midX, y: end.y });
+			} else {
+				const midY =
+					Math.abs(start.y - end.y) < 30
+						? Math.max(start.y, end.y) + 40
+						: Math.round((start.y + end.y) / 2);
+				rawPoints.push(
+					{ x: start.x - 25, y: start.y },
+					{ x: start.x - 25, y: midY },
+					{ x: end.x + 25, y: midY },
+					{ x: end.x + 25, y: end.y }
+				);
+			}
+		} else if (startSide === 'bottom' && endSide === 'top') {
+			if (start.y < end.y - 20) {
+				const midY = Math.round((start.y + end.y) / 2);
+				rawPoints.push({ x: start.x, y: midY }, { x: end.x, y: midY });
+			} else {
+				const midX =
+					Math.abs(start.x - end.x) < 30
+						? Math.max(start.x, end.x) + 40
+						: Math.round((start.x + end.x) / 2);
+				rawPoints.push(
+					{ x: start.x, y: start.y + 25 },
+					{ x: midX, y: start.y + 25 },
+					{ x: midX, y: end.y - 25 },
+					{ x: end.x, y: end.y - 25 }
+				);
+			}
+		} else if (startSide === 'top' && endSide === 'bottom') {
+			if (start.y > end.y + 20) {
+				const midY = Math.round((start.y + end.y) / 2);
+				rawPoints.push({ x: start.x, y: midY }, { x: end.x, y: midY });
+			} else {
+				const midX =
+					Math.abs(start.x - end.x) < 30
+						? Math.max(start.x, end.x) + 40
+						: Math.round((start.x + end.x) / 2);
+				rawPoints.push(
+					{ x: start.x, y: start.y - 25 },
+					{ x: midX, y: start.y - 25 },
+					{ x: midX, y: end.y + 25 },
+					{ x: end.x, y: end.y + 25 }
+				);
+			}
+		} else if (startSide === 'right' || startSide === 'left') {
+			rawPoints.push({ x: end.x, y: start.y });
+		} else {
+			rawPoints.push({ x: start.x, y: end.y });
+		}
+	} else {
+		if (Math.abs(end.x - start.x) > Math.abs(end.y - start.y)) {
+			const midX = Math.round((start.x + end.x) / 2);
+			rawPoints.push({ x: midX, y: start.y }, { x: midX, y: end.y });
+		} else {
+			const midY = Math.round((start.y + end.y) / 2);
+			rawPoints.push({ x: start.x, y: midY }, { x: end.x, y: midY });
+		}
+	}
+
+	rawPoints.push(pEnd);
+
+	// Filter out zero-length or duplicate segments and collinear points
+	const cleaned: PathPoint[] = [];
+	for (let i = 0; i < rawPoints.length; i++) {
+		const curr = rawPoints[i];
+		const prev = cleaned[cleaned.length - 1];
+		if (!prev) {
+			cleaned.push({ x: curr.x, y: curr.y, pressure: 0.5 });
+			continue;
+		}
+		if (Math.abs(curr.x - prev.x) < 1 && Math.abs(curr.y - prev.y) < 1) {
+			continue;
+		}
+		if (cleaned.length >= 2) {
+			const prevPrev = cleaned[cleaned.length - 2];
+			const isCollinearX = Math.abs(prevPrev.x - prev.x) < 1 && Math.abs(prev.x - curr.x) < 1;
+			const isCollinearY = Math.abs(prevPrev.y - prev.y) < 1 && Math.abs(prev.y - curr.y) < 1;
+			if (isCollinearX || isCollinearY) {
+				cleaned.pop();
+			}
+		}
+		cleaned.push({ x: curr.x, y: curr.y, pressure: 0.5 });
+	}
+
+	return cleaned.length >= 2 ? cleaned : [p0, pEnd];
+}
+
+export interface AlignmentGuide {
+	type: 'horizontal' | 'vertical';
+	pos: number;
+	from: number;
+	to: number;
+}
+
+export interface SnapResult {
+	dx: number;
+	dy: number;
+	guides: AlignmentGuide[];
+}
+
+export function calculateSnapAndGuides(
+	draggedBounds: BoundingBox,
+	shapes: Iterable<ShapeRecord>,
+	excludeIds: Set<string>,
+	threshold = 6
+): SnapResult {
+	let snapDx = 0;
+	let snapDy = 0;
+	let minDiffX = threshold + 1;
+	let minDiffY = threshold + 1;
+	const guides: AlignmentGuide[] = [];
+
+	const dLeft = draggedBounds.minX;
+	const dMidX = draggedBounds.minX + draggedBounds.width / 2;
+	const dRight = draggedBounds.maxX;
+
+	const dTop = draggedBounds.minY;
+	const dMidY = draggedBounds.minY + draggedBounds.height / 2;
+	const dBottom = draggedBounds.maxY;
+
+	const otherBoxes: { shape: ShapeRecord; bounds: BoundingBox }[] = [];
+	for (const shape of shapes) {
+		if (excludeIds.has(shape.id)) continue;
+		if (shape.type === 'path' && !shape.data?.isDiamond) continue;
+		otherBoxes.push({ shape, bounds: getShapeBounds(shape) });
+	}
+
+	// 1. Horizontal Snapping (X axis alignment -> Vertical guide lines)
+	let bestGuideX: AlignmentGuide | null = null;
+	for (const { bounds: o } of otherBoxes) {
+		const oLeft = o.minX;
+		const oMidX = o.minX + o.width / 2;
+		const oRight = o.maxX;
+
+		const xPairs: [number, number][] = [
+			[dLeft, oLeft],
+			[dLeft, oRight],
+			[dMidX, oMidX],
+			[dRight, oLeft],
+			[dRight, oRight]
+		];
+
+		for (const [dragVal, targetVal] of xPairs) {
+			const diff = targetVal - dragVal;
+			if (Math.abs(diff) <= threshold && Math.abs(diff) < minDiffX) {
+				minDiffX = Math.abs(diff);
+				snapDx = diff;
+				bestGuideX = {
+					type: 'vertical',
+					pos: targetVal,
+					from: Math.min(dTop, o.minY) - 20,
+					to: Math.max(dBottom, o.maxY) + 20
+				};
+			}
+		}
+	}
+	if (bestGuideX) guides.push(bestGuideX);
+
+	// 2. Vertical Snapping (Y axis alignment -> Horizontal guide lines)
+	let bestGuideY: AlignmentGuide | null = null;
+	for (const { bounds: o } of otherBoxes) {
+		const oTop = o.minY;
+		const oMidY = o.minY + o.height / 2;
+		const oBottom = o.maxY;
+
+		const yPairs: [number, number][] = [
+			[dTop, oTop],
+			[dTop, oBottom],
+			[dMidY, oMidY],
+			[dBottom, oTop],
+			[dBottom, oBottom]
+		];
+
+		for (const [dragVal, targetVal] of yPairs) {
+			const diff = targetVal - dragVal;
+			if (Math.abs(diff) <= threshold && Math.abs(diff) < minDiffY) {
+				minDiffY = Math.abs(diff);
+				snapDy = diff;
+				bestGuideY = {
+					type: 'horizontal',
+					pos: targetVal,
+					from: Math.min(dLeft, o.minX) - 20,
+					to: Math.max(dRight, o.maxX) + 20
+				};
+			}
+		}
+	}
+	if (bestGuideY) guides.push(bestGuideY);
+
+	return { dx: snapDx, dy: snapDy, guides };
+}
+
+export interface QuickAddButton {
+	shapeId: string;
+	side: AnchorSide;
+	x: number;
+	y: number;
+	radius: number;
+}
+
+export function getQuickAddButtons(shape: ShapeRecord, distance = 28): QuickAddButton[] {
+	const cx = shape.x + shape.width / 2;
+	const cy = shape.y + shape.height / 2;
+	const r = 11;
+	return [
+		{ shapeId: shape.id, side: 'top', x: cx, y: shape.y - distance, radius: r },
+		{ shapeId: shape.id, side: 'right', x: shape.x + shape.width + distance, y: cy, radius: r },
+		{ shapeId: shape.id, side: 'bottom', x: cx, y: shape.y + shape.height + distance, radius: r },
+		{ shapeId: shape.id, side: 'left', x: shape.x - distance, y: cy, radius: r }
+	];
+}

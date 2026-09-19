@@ -1,4 +1,13 @@
-import { getResizeHandles, getShapeBounds, isResizableShape, screenToWorld } from './math';
+import {
+	calculateOrthogonalPath,
+	getResizeHandles,
+	getShapeBounds,
+	isResizableShape,
+	screenToWorld,
+	type AlignmentGuide,
+	type AnchorSide,
+	type QuickAddButton
+} from './math';
 import { getFontFamilyCss, wrapText } from './canvas-text';
 import type { PathPoint, PeerPresence, ShapeRecord } from '../types';
 
@@ -296,7 +305,10 @@ export function drawLinePreview(
 	strokeColor: string,
 	strokeWidth: number,
 	isArrow: boolean,
-	isShiftPressed: boolean
+	isShiftPressed: boolean,
+	routing: 'straight' | 'orthogonal' = 'straight',
+	startSide?: AnchorSide,
+	endSide?: AnchorSide
 ) {
 	const end = calculateLineEndPoint(startPoint, currentPoint, isShiftPressed);
 
@@ -307,13 +319,31 @@ export function drawLinePreview(
 	ctx.lineCap = 'round';
 	ctx.lineJoin = 'round';
 
-	ctx.beginPath();
-	ctx.moveTo(startPoint.x, startPoint.y);
-	ctx.lineTo(end.x, end.y);
-	ctx.stroke();
+	if (routing === 'orthogonal') {
+		const points = calculateOrthogonalPath(startPoint, end, startSide, endSide);
+		if (points.length >= 2) {
+			ctx.beginPath();
+			ctx.moveTo(points[0].x, points[0].y);
+			for (let i = 1; i < points.length; i++) {
+				ctx.lineTo(points[i].x, points[i].y);
+			}
+			ctx.stroke();
 
-	if (isArrow) {
-		drawArrowHead(ctx, startPoint.x, startPoint.y, end.x, end.y, strokeColor, strokeWidth);
+			if (isArrow) {
+				const p1 = points[points.length - 2];
+				const p2 = points[points.length - 1];
+				drawArrowHead(ctx, p1.x, p1.y, p2.x, p2.y, strokeColor, strokeWidth);
+			}
+		}
+	} else {
+		ctx.beginPath();
+		ctx.moveTo(startPoint.x, startPoint.y);
+		ctx.lineTo(end.x, end.y);
+		ctx.stroke();
+
+		if (isArrow) {
+			drawArrowHead(ctx, startPoint.x, startPoint.y, end.x, end.y, strokeColor, strokeWidth);
+		}
 	}
 	ctx.restore();
 }
@@ -489,6 +519,67 @@ export function drawShapeCenteredText(
 	for (const line of lines) {
 		ctx.fillText(line, cx, curY);
 		curY += lineHeight;
+	}
+	ctx.restore();
+}
+
+export function drawAlignmentGuides(
+	ctx: CanvasRenderingContext2D,
+	guides: AlignmentGuide[],
+	zoom: number
+) {
+	if (!guides || guides.length === 0) return;
+
+	ctx.save();
+	ctx.lineWidth = 1 / zoom;
+	ctx.strokeStyle = '#06b6d4';
+	ctx.setLineDash([4 / zoom, 4 / zoom]);
+
+	for (const guide of guides) {
+		ctx.beginPath();
+		if (guide.type === 'vertical') {
+			ctx.moveTo(guide.pos, guide.from);
+			ctx.lineTo(guide.pos, guide.to);
+		} else {
+			ctx.moveTo(guide.from, guide.pos);
+			ctx.lineTo(guide.to, guide.pos);
+		}
+		ctx.stroke();
+	}
+	ctx.restore();
+}
+
+export function drawQuickAddButtons(
+	ctx: CanvasRenderingContext2D,
+	buttons: QuickAddButton[],
+	zoom: number,
+	hoveredSide: string | null = null
+) {
+	if (!buttons || buttons.length === 0) return;
+
+	ctx.save();
+	for (const b of buttons) {
+		const isHovered = hoveredSide === b.side;
+		const r = (isHovered ? 12 : 10) / zoom;
+
+		ctx.beginPath();
+		ctx.arc(b.x, b.y, r, 0, Math.PI * 2);
+		ctx.fillStyle = isHovered ? '#4f46e5' : '#1e1b4b';
+		ctx.fill();
+		ctx.lineWidth = 1.5 / zoom;
+		ctx.strokeStyle = isHovered ? '#a5b4fc' : '#6366f1';
+		ctx.stroke();
+
+		// Draw '+' symbol
+		const plusR = (isHovered ? 5 : 4) / zoom;
+		ctx.beginPath();
+		ctx.moveTo(b.x - plusR, b.y);
+		ctx.lineTo(b.x + plusR, b.y);
+		ctx.moveTo(b.x, b.y - plusR);
+		ctx.lineTo(b.x, b.y + plusR);
+		ctx.lineWidth = 1.8 / zoom;
+		ctx.strokeStyle = '#ffffff';
+		ctx.stroke();
 	}
 	ctx.restore();
 }

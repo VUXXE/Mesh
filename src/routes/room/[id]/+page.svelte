@@ -2,6 +2,7 @@
 	import { onDestroy, onMount } from 'svelte';
 	import { page } from '$app/state';
 	import Canvas from '$lib/components/Canvas.svelte';
+	import MermaidModal from '$lib/components/MermaidModal.svelte';
 	import MiniMap from '$lib/components/MiniMap.svelte';
 	import PresenceBar from '$lib/components/PresenceBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
@@ -19,7 +20,18 @@
 	let selectedIds = $state<string[]>([]);
 	let authPassword = $state('');
 	let passwordClaimed = false;
+	let isMermaidModalOpen = $state(false);
 	const history = new HistoryManager();
+
+	function getViewportCenter(): { x: number; y: number } {
+		if (!engine) return { x: 0, y: 0 };
+		const w = typeof window !== 'undefined' ? window.innerWidth : 1920;
+		const h = typeof window !== 'undefined' ? window.innerHeight : 1080;
+		return {
+			x: Math.round((w / 2 - engine.viewport.panX) / engine.viewport.zoom),
+			y: Math.round((h / 2 - engine.viewport.panY) / engine.viewport.zoom)
+		};
+	}
 
 	onMount(() => {
 		if (!isValidRoomId) return;
@@ -84,6 +96,12 @@
 				return;
 			}
 
+			if (isMod && (e.key === 'm' || e.key === 'M')) {
+				e.preventDefault();
+				isMermaidModalOpen = true;
+				return;
+			}
+
 			if (isMod && e.key === ']') {
 				e.preventDefault();
 				engine?.bringToFront();
@@ -125,6 +143,8 @@
 					engine?.setTool('text');
 				} else if (e.key === 's' || e.key === 'S') {
 					engine?.setTool('sticky_note');
+				} else if (e.key === 'm' || e.key === 'M') {
+					isMermaidModalOpen = true;
 				} else if (e.key === 'Delete' || e.key === 'Backspace') {
 					engine?.deleteSelected();
 				} else if (e.key === 'Escape') {
@@ -367,10 +387,22 @@
 			onUndo={handleUndo}
 			onRedo={handleRedo}
 			onClearCanvas={handleClearCanvas}
+			onOpenMermaid={() => (isMermaidModalOpen = true)}
 		/>
 
 		<!-- Bottom-Right Radar Minimap -->
 		<MiniMap {engine} shapes={socket.shapes} />
+
+		<!-- Mermaid Flowchart Generator Modal -->
+		<MermaidModal
+			isOpen={isMermaidModalOpen}
+			onClose={() => (isMermaidModalOpen = false)}
+			onInsertShapes={(newShapes) => {
+				engine?.insertBatchShapes(newShapes);
+			}}
+			viewportCenter={getViewportCenter()}
+			startZIndex={engine?.getNextZIndex() ?? 1}
+		/>
 
 		<!-- Password Gate -->
 		{#if socket.authRequired && !socket.authed}

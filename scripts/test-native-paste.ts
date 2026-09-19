@@ -41,7 +41,11 @@ function createMockCanvas(): any {
 		fillText: () => {},
 		measureText: (text: string) => ({ width: text.length * 10 }),
 		setLineDash: () => {},
-		translate: () => {}
+		translate: () => {},
+		moveTo: () => {},
+		lineTo: () => {},
+		closePath: () => {},
+		arc: () => {}
 	};
 
 	return {

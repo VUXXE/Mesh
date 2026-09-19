@@ -1,6 +1,9 @@
 import {
+	calculateOrthogonalPath,
 	calculateResizedBounds,
+	calculateSnapAndGuides,
 	findNearestAnchor,
+	getQuickAddButtons,
 	getResizeCursor,
 	getResizeHandles,
 	getShapeAnchors,
@@ -11,8 +14,10 @@ import {
 	isShapeInsideMarquee,
 	screenToWorld,
 	simplifyRDP,
+	type AlignmentGuide,
 	type AnchorSide,
 	type BoundingBox,
+	type QuickAddButton,
 	type ResizeHandle,
 	type ShapeAnchor
 } from './math';
@@ -39,6 +44,7 @@ export interface InteractionHost {
 	strokeWidth: number;
 	fontSize: number;
 	fontFamily: string;
+	arrowRouting?: 'straight' | 'orthogonal';
 	isSpacePressed: boolean;
 	isShiftPressed: boolean;
 	selectedIds: string[];
@@ -55,6 +61,7 @@ export interface InteractionHost {
 		fontSize: number,
 		fontFamily?: string
 	): { width: number; height: number };
+	quickAddConnectedNode?(sourceShapeId: string, side: AnchorSide): ShapeRecord | null;
 	emitViewportChanged(): void;
 	renderBuffer(): void;
 	renderOverlay(): void;
@@ -69,6 +76,8 @@ export class InteractionController {
 	startPoint = { x: 0, y: 0 };
 	currentPoint = { x: 0, y: 0 };
 	activePathPoints: PathPoint[] = [];
+	activeGuides: AlignmentGuide[] = [];
+	hoveredQuickAddSide: AnchorSide | null = null;
 
 	private activePointers = new Map<number, { x: number; y: number }>();
 	private initialPinchDist = 0;
@@ -90,11 +99,24 @@ export class InteractionController {
 		return this.activeHoverAnchor;
 	}
 
+	getActiveStartAnchor(): { shapeId: string; side: AnchorSide } | null {
+		return this.activeStartAnchor;
+	}
+
+	getActiveGuides(): AlignmentGuide[] {
+		return this.activeGuides;
+	}
+
+	getHoveredQuickAddSide(): AnchorSide | null {
+		return this.hoveredQuickAddSide;
+	}
+
 	constructor(private host: InteractionHost) {}
 
 	handlePointerLeave() {
 		if (!this.isInteracting) {
 			this.host.overlayCanvas.style.cursor = '';
+			this.hoveredQuickAddSide = null;
 			this.host.onCursorMoved?.(null);
 		}
 	}
@@ -106,11 +128,53 @@ export class InteractionController {
 			this.host.editingShapeId !== null
 		) {
 			this.host.overlayCanvas.style.cursor = '';
+			if (this.hoveredQuickAddSide !== null) {
+				this.hoveredQuickAddSide = null;
+				this.host.renderOverlay();
+			}
 			return;
 		}
 
 		const selectedShape = this.host.getShape(this.host.selectedIds[0]);
-		if (!selectedShape || !isResizableShape(selectedShape.type)) {
+		if (!selectedShape) {
+			this.host.overlayCanvas.style.cursor = '';
+			return;
+		}
+
+		// Check hover on QuickAdd buttons
+		if (
+			selectedShape.type === 'rectangle' ||
+			selectedShape.type === 'ellipse' ||
+			selectedShape.type === 'sticky_note' ||
+			(selectedShape.type === 'path' && selectedShape.data?.isDiamond)
+		) {
+			const buttons = getQuickAddButtons(selectedShape);
+			const worldPos = screenToWorld(
+				screenPos.x,
+				screenPos.y,
+				this.host.viewport.panX,
+				this.host.viewport.panY,
+				this.host.viewport.zoom
+			);
+			const hitBtn = buttons.find(
+				(b) => Math.hypot(worldPos.x - b.x, worldPos.y - b.y) <= b.radius * 1.5
+			);
+			if (hitBtn) {
+				if (this.hoveredQuickAddSide !== hitBtn.side) {
+					this.hoveredQuickAddSide = hitBtn.side;
+					this.host.overlayCanvas.style.cursor = 'pointer';
+					this.host.renderOverlay();
+				}
+				return;
+			}
+		}
+
+		if (this.hoveredQuickAddSide !== null) {
+			this.hoveredQuickAddSide = null;
+			this.host.renderOverlay();
+		}
+
+		if (!isResizableShape(selectedShape.type)) {
 			this.host.overlayCanvas.style.cursor = '';
 			return;
 		}
@@ -214,40 +278,57 @@ export class InteractionController {
 		if (this.host.tool === 'select') {
 			if (this.host.selectedIds.length === 1) {
 				const selectedShape = this.host.getShape(this.host.selectedIds[0]);
-				if (
-					selectedShape &&
-					isResizableShape(selectedShape.type) &&
-					this.host.editingShapeId !== selectedShape.id
-				) {
-					const bounds = getShapeBounds(selectedShape);
-					const hitHandle = hitTestResizeHandles(
-						screenPos,
-						bounds,
-						this.host.viewport.panX,
-						this.host.viewport.panY,
-						this.host.viewport.zoom
-					);
-					if (hitHandle) {
-						this.interactionType = 'resize_shape';
-						this.activeResizeHandle = hitHandle;
-						this.resizeInitialPointer = { x: worldPos.x, y: worldPos.y };
-						this.resizeInitialShape = {
-							...selectedShape,
-							data:
-								selectedShape.type === 'path'
-									? {
-											...selectedShape.data,
-											points: (selectedShape.data?.points ?? []).map((p: PathPoint) => ({
-												...p
-											}))
-										}
-									: selectedShape.data
-										? { ...selectedShape.data }
-										: undefined
-						};
-						this.host.overlayCanvas.style.cursor = getResizeCursor(hitHandle);
-						this.host.renderOverlay();
-						return;
+				if (selectedShape && this.host.editingShapeId !== selectedShape.id) {
+					// Check Quick-Add button click
+					if (
+						selectedShape.type === 'rectangle' ||
+						selectedShape.type === 'ellipse' ||
+						selectedShape.type === 'sticky_note' ||
+						(selectedShape.type === 'path' && selectedShape.data?.isDiamond)
+					) {
+						const buttons = getQuickAddButtons(selectedShape);
+						const hitBtn = buttons.find(
+							(b) => Math.hypot(worldPos.x - b.x, worldPos.y - b.y) <= b.radius * 1.5
+						);
+						if (hitBtn) {
+							this.isInteracting = false;
+							this.interactionType = null;
+							this.host.quickAddConnectedNode?.(selectedShape.id, hitBtn.side);
+							return;
+						}
+					}
+
+					if (isResizableShape(selectedShape.type)) {
+						const bounds = getShapeBounds(selectedShape);
+						const hitHandle = hitTestResizeHandles(
+							screenPos,
+							bounds,
+							this.host.viewport.panX,
+							this.host.viewport.panY,
+							this.host.viewport.zoom
+						);
+						if (hitHandle) {
+							this.interactionType = 'resize_shape';
+							this.activeResizeHandle = hitHandle;
+							this.resizeInitialPointer = { x: worldPos.x, y: worldPos.y };
+							this.resizeInitialShape = {
+								...selectedShape,
+								data:
+									selectedShape.type === 'path'
+										? {
+												...selectedShape.data,
+												points: (selectedShape.data?.points ?? []).map((p: PathPoint) => ({
+													...p
+												}))
+											}
+										: selectedShape.data
+											? { ...selectedShape.data }
+											: undefined
+							};
+							this.host.overlayCanvas.style.cursor = getResizeCursor(hitHandle);
+							this.host.renderOverlay();
+							return;
+						}
 					}
 				}
 			}
@@ -501,8 +582,35 @@ export class InteractionController {
 		}
 
 		if (this.interactionType === 'drag_selection') {
-			const dx = worldPos.x - this.startPoint.x;
-			const dy = worldPos.y - this.startPoint.y;
+			let dx = worldPos.x - this.startPoint.x;
+			let dy = worldPos.y - this.startPoint.y;
+
+			// If dragging 1 shape: compute smart alignment snapping and guidelines
+			if (this.dragInitialPositions.size === 1) {
+				const [singleId, initialPos] = Array.from(this.dragInitialPositions.entries())[0];
+				const singleShape = this.host.getShape(singleId);
+				if (singleShape) {
+					const tempBounds = {
+						minX: initialPos.x + dx,
+						minY: initialPos.y + dy,
+						maxX: initialPos.x + dx + singleShape.width,
+						maxY: initialPos.y + dy + singleShape.height,
+						width: singleShape.width,
+						height: singleShape.height
+					};
+					const snap = calculateSnapAndGuides(
+						tempBounds,
+						this.host.getShapes().values(),
+						new Set([singleId]),
+						8 / this.host.viewport.zoom
+					);
+					dx += snap.dx;
+					dy += snap.dy;
+					this.activeGuides = snap.guides;
+				}
+			} else {
+				this.activeGuides = [];
+			}
 
 			const movedIds = new Set<string>();
 			for (const [id, initialPos] of this.dragInitialPositions) {
@@ -609,13 +717,24 @@ export class InteractionController {
 			const dx = this.currentPoint.x - this.startPoint.x;
 			const dy = this.currentPoint.y - this.startPoint.y;
 			if (Math.hypot(dx, dy) >= 3) {
-				const points: PathPoint[] = [
-					{ x: this.startPoint.x, y: this.startPoint.y, pressure: 0.5 },
-					{ x: this.currentPoint.x, y: this.currentPoint.y, pressure: 0.5 }
-				];
-				const bounds = this.calculatePointsBounds(points);
 				const isArrow = this.host.tool === 'arrow';
-				const shapeData: any = { points, isArrow };
+				const routing = this.host.arrowRouting || 'straight';
+				let points: PathPoint[];
+				if (routing === 'orthogonal') {
+					points = calculateOrthogonalPath(
+						this.startPoint,
+						this.currentPoint,
+						this.activeStartAnchor?.side,
+						this.activeHoverAnchor?.side
+					);
+				} else {
+					points = [
+						{ x: this.startPoint.x, y: this.startPoint.y, pressure: 0.5 },
+						{ x: this.currentPoint.x, y: this.currentPoint.y, pressure: 0.5 }
+					];
+				}
+				const bounds = this.calculatePointsBounds(points);
+				const shapeData: any = { points, isArrow, routing };
 				if (this.activeStartAnchor) {
 					shapeData.startAnchor = this.activeStartAnchor;
 				}
@@ -821,6 +940,7 @@ export class InteractionController {
 
 		this.isInteracting = false;
 		this.interactionType = null;
+		this.activeGuides = [];
 		this.marqueeInitialSelected = [];
 		this.host.renderBuffer();
 		this.host.renderOverlay();
@@ -918,6 +1038,14 @@ export class InteractionController {
 			}
 
 			if (modified) {
+				if (shape.data?.routing === 'orthogonal') {
+					points = calculateOrthogonalPath(
+						points[0],
+						points[points.length - 1],
+						startAnchor?.side,
+						endAnchor?.side
+					);
+				}
 				const bounds = this.calculatePointsBounds(points);
 				shape.x = bounds.minX;
 				shape.y = bounds.minY;
