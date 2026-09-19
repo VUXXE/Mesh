@@ -21,7 +21,14 @@ import {
 	type ResizeHandle,
 	type ShapeAnchor
 } from './math';
-import type { PathPoint, ShapeRecord, ShapeType } from '../types';
+import type {
+	CornerRoundness,
+	FillStyle,
+	PathPoint,
+	ShapeRecord,
+	ShapeType,
+	StrokeStyle
+} from '../types';
 import type { HistoryAction } from './history.svelte';
 
 export type InteractionType =
@@ -45,6 +52,10 @@ export interface InteractionHost {
 	fontSize: number;
 	fontFamily: string;
 	arrowRouting?: 'straight' | 'orthogonal';
+	strokeStyle?: StrokeStyle;
+	fillStyle?: FillStyle;
+	roundness?: CornerRoundness;
+	opacity?: number;
 	isSpacePressed: boolean;
 	isShiftPressed: boolean;
 	selectedIds: string[];
@@ -704,7 +715,11 @@ export class InteractionController {
 					strokeWidth: this.host.strokeWidth,
 					rotation: 0,
 					zIndex: this.host.getNextZIndex(),
-					data: { points: simplified },
+					data: {
+						points: simplified,
+						strokeStyle: this.host.strokeStyle || 'solid',
+						opacity: this.host.opacity ?? 1
+					},
 					createdBy: '',
 					updatedAt: now
 				};
@@ -734,7 +749,13 @@ export class InteractionController {
 					];
 				}
 				const bounds = this.calculatePointsBounds(points);
-				const shapeData: any = { points, isArrow, routing };
+				const shapeData: any = {
+					points,
+					isArrow,
+					routing,
+					strokeStyle: this.host.strokeStyle || 'solid',
+					opacity: this.host.opacity ?? 1
+				};
 				if (this.activeStartAnchor) {
 					shapeData.startAnchor = this.activeStartAnchor;
 				}
@@ -775,7 +796,12 @@ export class InteractionController {
 			let height = Math.abs(this.currentPoint.y - this.startPoint.y);
 
 			let shapeType: ShapeType = 'rectangle';
-			let shapeData: any = undefined;
+			const shapeData: any = {
+				strokeStyle: this.host.strokeStyle || 'solid',
+				fillStyle: this.host.fillStyle || 'solid',
+				roundness: this.host.roundness || 'round',
+				opacity: this.host.opacity ?? 1
+			};
 
 			if (this.host.tool === 'ellipse') {
 				shapeType = 'ellipse';
@@ -792,10 +818,12 @@ export class InteractionController {
 					{ x, y: y + height / 2 },
 					{ x: x + width / 2, y }
 				];
-				shapeData = { isDiamond: true, points, text: '' };
+				shapeData.isDiamond = true;
+				shapeData.points = points;
+				shapeData.text = '';
 			} else if (this.host.tool === 'sticky_note') {
 				shapeType = 'sticky_note';
-				shapeData = { text: '' };
+				shapeData.text = '';
 				if (width < 15 && height < 15) {
 					width = 180;
 					height = 180;

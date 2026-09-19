@@ -1,4 +1,11 @@
-import type { PathPoint, PeerPresence, ShapeRecord } from '../types';
+import type {
+	CornerRoundness,
+	FillStyle,
+	PathPoint,
+	PeerPresence,
+	ShapeRecord,
+	StrokeStyle
+} from '../types';
 import type { HistoryAction } from './history.svelte';
 import {
 	FONT_FAMILIES,
@@ -157,6 +164,10 @@ export class CanvasEngine implements InteractionHost {
 	strokeColor = '#f4f4f5';
 	fillColor = 'transparent';
 	strokeWidth = 2;
+	strokeStyle: StrokeStyle = 'solid';
+	fillStyle: FillStyle = 'solid';
+	roundness: CornerRoundness = 'round';
+	opacity = 1;
 	fontSize = 18;
 	fontFamily = 'sans';
 
@@ -216,7 +227,12 @@ export class CanvasEngine implements InteractionHost {
 	onActionRecorded?: (action: HistoryAction) => void;
 	onToolChanged?: (tool: ToolMode) => void;
 	onStrokeColorChanged?: (color: string) => void;
+	onFillColorChanged?: (color: string) => void;
 	onStrokeWidthChanged?: (width: number) => void;
+	onStrokeStyleChanged?: (style: StrokeStyle) => void;
+	onFillStyleChanged?: (style: FillStyle) => void;
+	onRoundnessChanged?: (roundness: CornerRoundness) => void;
+	onOpacityChanged?: (opacity: number) => void;
 	onFontFamilyChanged?: (family: string) => void;
 	onFontSizeChanged?: (size: number) => void;
 	onArrowRoutingChanged?: (routing: 'straight' | 'orthogonal') => void;
@@ -487,6 +503,31 @@ export class CanvasEngine implements InteractionHost {
 	setFillColor(color: string) {
 		this.fillColor = color;
 		this.applyPropertyToSelection({ fill: color });
+		this.onFillColorChanged?.(color);
+	}
+
+	setStrokeStyle(style: StrokeStyle) {
+		this.strokeStyle = style;
+		this.applyDataPropertyToSelection({ strokeStyle: style });
+		this.onStrokeStyleChanged?.(style);
+	}
+
+	setFillStyle(style: FillStyle) {
+		this.fillStyle = style;
+		this.applyDataPropertyToSelection({ fillStyle: style });
+		this.onFillStyleChanged?.(style);
+	}
+
+	setRoundness(roundness: CornerRoundness) {
+		this.roundness = roundness;
+		this.applyDataPropertyToSelection({ roundness });
+		this.onRoundnessChanged?.(roundness);
+	}
+
+	setOpacity(opacity: number) {
+		this.opacity = opacity;
+		this.applyDataPropertyToSelection({ opacity });
+		this.onOpacityChanged?.(opacity);
 	}
 
 	setStrokeWidth(width: number) {
@@ -737,6 +778,41 @@ export class CanvasEngine implements InteractionHost {
 		}
 	}
 
+	private applyDataPropertyToSelection(dataProps: Record<string, unknown>) {
+		if (this.selectedIds.length === 0) return;
+		const before: ShapeRecord[] = [];
+		const modified: ShapeRecord[] = [];
+		const now = Date.now();
+
+		for (const id of this.selectedIds) {
+			const shape = this.shapes.get(id);
+			if (shape) {
+				before.push({ ...shape, data: shape.data ? { ...shape.data } : undefined });
+				const updated: ShapeRecord = {
+					...shape,
+					data: {
+						...shape.data,
+						...dataProps
+					},
+					updatedAt: now
+				};
+				this.shapes.set(id, updated);
+				modified.push(updated);
+			}
+		}
+
+		if (modified.length > 0) {
+			this.onShapesMutated?.(modified);
+			this.onActionRecorded?.({
+				type: 'modify',
+				before,
+				after: modified
+			});
+			this.renderBuffer();
+			this.renderOverlay();
+		}
+	}
+
 	drawArrowHead(
 		ctx: CanvasRenderingContext2D,
 		fromX: number,
@@ -934,7 +1010,12 @@ export class CanvasEngine implements InteractionHost {
 		const nextZ = this.getNextZIndex();
 
 		const isDiamond = sourceShape.type === 'path' && sourceShape.data?.isDiamond;
-		let newShapeData: Record<string, unknown> = {};
+		let newShapeData: Record<string, unknown> = {
+			...(sourceShape.data?.strokeStyle ? { strokeStyle: sourceShape.data.strokeStyle } : {}),
+			...(sourceShape.data?.fillStyle ? { fillStyle: sourceShape.data.fillStyle } : {}),
+			...(sourceShape.data?.roundness ? { roundness: sourceShape.data.roundness } : {}),
+			...(sourceShape.data?.opacity !== undefined ? { opacity: sourceShape.data.opacity } : {})
+		};
 		if (isDiamond) {
 			const points: PathPoint[] = [
 				{ x: newX + width / 2, y: newY },
@@ -943,9 +1024,9 @@ export class CanvasEngine implements InteractionHost {
 				{ x: newX, y: newY + height / 2 },
 				{ x: newX + width / 2, y: newY }
 			];
-			newShapeData = { isDiamond: true, points, text: '' };
+			newShapeData = { ...newShapeData, isDiamond: true, points, text: '' };
 		} else if (sourceShape.type === 'sticky_note') {
-			newShapeData = { text: '' };
+			newShapeData = { ...newShapeData, text: '' };
 		}
 
 		const newShape: ShapeRecord = {
@@ -1453,7 +1534,10 @@ export class CanvasEngine implements InteractionHost {
 		const { interactionType, activePathPoints, startPoint, currentPoint } = this.interactions;
 
 		if (interactionType === 'draw' && activePathPoints.length > 1) {
-			drawActiveStroke(ctx, activePathPoints, this.strokeColor, this.strokeWidth);
+			drawActiveStroke(ctx, activePathPoints, this.strokeColor, this.strokeWidth, {
+				strokeStyle: this.strokeStyle,
+				opacity: this.opacity
+			});
 		} else if (interactionType === 'create_line') {
 			const startAnchor = this.interactions.getActiveStartAnchor();
 			const hoverAnchor = this.interactions.getActiveHoverAnchor();
@@ -1467,7 +1551,11 @@ export class CanvasEngine implements InteractionHost {
 				this.isShiftPressed,
 				this.arrowRouting,
 				startAnchor?.side,
-				hoverAnchor?.side
+				hoverAnchor?.side,
+				{
+					strokeStyle: this.strokeStyle,
+					opacity: this.opacity
+				}
 			);
 		} else if (interactionType === 'create_shape') {
 			drawShapePreview(
@@ -1477,7 +1565,13 @@ export class CanvasEngine implements InteractionHost {
 				this.tool,
 				this.strokeColor,
 				this.fillColor,
-				this.strokeWidth
+				this.strokeWidth,
+				{
+					strokeStyle: this.strokeStyle,
+					fillStyle: this.fillStyle,
+					roundness: this.roundness,
+					opacity: this.opacity
+				}
 			);
 		} else if (interactionType === 'marquee') {
 			drawMarqueeBox(ctx, startPoint, currentPoint, this.viewport.zoom);

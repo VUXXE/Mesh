@@ -123,15 +123,75 @@ export function exportToSvg(
 	const h = Math.max(bounds.height + padding * 2, 100);
 
 	let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${bounds.minX - padding} ${bounds.minY - padding} ${w} ${h}" width="${w}" height="${h}">\n`;
+
+	const patterns = new Set<string>();
+	for (const s of shapes.values()) {
+		const fs = s.data?.fillStyle;
+		if ((fs === 'hachure' || fs === 'cross-hatch') && s.fill && s.fill !== 'transparent') {
+			patterns.add(`${fs}:${s.fill}`);
+		}
+	}
+
+	if (patterns.size > 0) {
+		svgContent += `<defs>\n`;
+		for (const p of patterns) {
+			const [type, color] = p.split(':');
+			const cleanColor = color.replace(/[^a-zA-Z0-9]/g, '');
+			const id = `pat-${type}-${cleanColor}`;
+			if (type === 'hachure') {
+				svgContent += `  <pattern id="${id}" width="10" height="10" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">\n`;
+				svgContent += `    <line x1="0" y1="0" x2="0" y2="10" stroke="${color}" stroke-width="1.5"/>\n`;
+				svgContent += `  </pattern>\n`;
+			} else {
+				svgContent += `  <pattern id="${id}" width="10" height="10" patternUnits="userSpaceOnUse">\n`;
+				svgContent += `    <path d="M 0 10 L 10 0 M 0 0 L 10 10" stroke="${color}" stroke-width="1.5"/>\n`;
+				svgContent += `  </pattern>\n`;
+			}
+		}
+		svgContent += `</defs>\n`;
+	}
+
 	svgContent += `<rect x="${bounds.minX - padding}" y="${bounds.minY - padding}" width="${w}" height="${h}" fill="${themeCanvasBg}"/>\n`;
+
+	function getSvgFill(shape: ShapeRecord): string {
+		if (!shape.fill || shape.fill === 'transparent') return 'none';
+		const fs = shape.data?.fillStyle;
+		if (fs === 'hachure' || fs === 'cross-hatch') {
+			const cleanColor = shape.fill.replace(/[^a-zA-Z0-9]/g, '');
+			return `url(#pat-${fs}-${cleanColor})`;
+		}
+		return shape.fill;
+	}
+
+	function getSvgStrokeDash(shape: ShapeRecord): string {
+		const ss = shape.data?.strokeStyle;
+		const sw = shape.strokeWidth || 2;
+		if (ss === 'dashed') return ` stroke-dasharray="${Math.max(sw * 3, 8)} ${Math.max(sw * 2, 6)}"`;
+		if (ss === 'dotted') return ` stroke-dasharray="${Math.max(sw, 2)} ${Math.max(sw * 2, 5)}"`;
+		return '';
+	}
+
+	function getSvgOpacity(shape: ShapeRecord): string {
+		if (
+			shape.data?.opacity !== undefined &&
+			shape.data.opacity !== null &&
+			Number(shape.data.opacity) < 1
+		) {
+			return ` opacity="${shape.data.opacity}"`;
+		}
+		return '';
+	}
 
 	const sorted = Array.from(shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
 	for (const shape of sorted) {
+		const dashAttr = getSvgStrokeDash(shape);
+		const opacityAttr = getSvgOpacity(shape);
+
 		if (shape.type === 'path') {
 			const points: PathPoint[] = shape.data?.points ?? [];
 			if (shape.data?.isDiamond && points.length >= 4) {
 				const pts = points.map((p) => `${p.x},${p.y}`).join(' ');
-				svgContent += `<polygon points="${pts}" fill="${shape.fill || 'none'}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linejoin="round"/>\n`;
+				svgContent += `<polygon points="${pts}" fill="${getSvgFill(shape)}"${dashAttr}${opacityAttr} stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linejoin="round"/>\n`;
 
 				const text = shape.data?.text || '';
 				if (text) {
@@ -143,7 +203,7 @@ export function exportToSvg(
 					const lineHeight = fSize * 1.3;
 					const totalH = lines.length * lineHeight;
 					const startY = cy - totalH / 2 + fSize * 0.8;
-					svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
+					svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}"${opacityAttr}>\n`;
 					for (let i = 0; i < lines.length; i++) {
 						const dy = i === 0 ? '0' : '1.3em';
 						svgContent += `<tspan x="${cx}" dy="${dy}">${escapeXml(lines[i])}</tspan>\n`;
@@ -152,7 +212,7 @@ export function exportToSvg(
 				}
 			} else if (points.length >= 2) {
 				const d = points.map((p, idx) => `${idx === 0 ? 'M' : 'L'} ${p.x} ${p.y}`).join(' ');
-				svgContent += `<path d="${d}" fill="none" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
+				svgContent += `<path d="${d}" fill="none"${dashAttr}${opacityAttr} stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}" stroke-linecap="round" stroke-linejoin="round"/>\n`;
 
 				if (shape.data?.isArrow && points.length >= 2) {
 					const p1 = points[points.length - 2];
@@ -164,7 +224,7 @@ export function exportToSvg(
 					const y1 = p2.y - headLength * Math.sin(angle - arrowAngle);
 					const x2 = p2.x - headLength * Math.cos(angle + arrowAngle);
 					const y2 = p2.y - headLength * Math.sin(angle + arrowAngle);
-					svgContent += `<polygon points="${p2.x},${p2.y} ${x1},${y1} ${x2},${y2}" fill="${shape.stroke}"/>\n`;
+					svgContent += `<polygon points="${p2.x},${p2.y} ${x1},${y1} ${x2},${y2}" fill="${shape.stroke}"${opacityAttr}/>\n`;
 				}
 			}
 		} else if (shape.type === 'rectangle') {
@@ -172,7 +232,9 @@ export function exportToSvg(
 			const ry = Math.min(shape.y, shape.y + shape.height);
 			const rw = Math.max(Math.abs(shape.width), 1);
 			const rh = Math.max(Math.abs(shape.height), 1);
-			svgContent += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="4" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
+			const isRound = shape.data?.roundness === 'round' || shape.data?.roundness === undefined;
+			const cr = isRound ? Math.min(10, Math.min(rw, rh) / 4) : 0;
+			svgContent += `<rect x="${rx}" y="${ry}" width="${rw}" height="${rh}" rx="${cr}" fill="${getSvgFill(shape)}"${dashAttr}${opacityAttr} stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
 
 			const text = shape.data?.text || '';
 			if (text) {
@@ -184,7 +246,7 @@ export function exportToSvg(
 				const lineHeight = fSize * 1.3;
 				const totalH = lines.length * lineHeight;
 				const startY = cy - totalH / 2 + fSize * 0.8;
-				svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}">\n`;
+				svgContent += `<text x="${cx}" y="${startY}" text-anchor="middle" font-family="${fFamily}" font-size="${fSize}" fill="${shape.stroke}"${opacityAttr}>\n`;
 				for (let i = 0; i < lines.length; i++) {
 					const dy = i === 0 ? '0' : '1.3em';
 					svgContent += `<tspan x="${cx}" dy="${dy}">${escapeXml(lines[i])}</tspan>\n`;
@@ -196,7 +258,7 @@ export function exportToSvg(
 			const ry = Math.max(Math.abs(shape.height / 2), 1);
 			const cx = shape.x + shape.width / 2;
 			const cy = shape.y + shape.height / 2;
-			svgContent += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${shape.fill}" stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
+			svgContent += `<ellipse cx="${cx}" cy="${cy}" rx="${rx}" ry="${ry}" fill="${getSvgFill(shape)}"${dashAttr}${opacityAttr} stroke="${shape.stroke}" stroke-width="${shape.strokeWidth}"/>\n`;
 
 			const text = shape.data?.text || '';
 			if (text) {

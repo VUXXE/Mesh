@@ -1,6 +1,7 @@
 <script lang="ts">
 	import type { CanvasEngine, ToolMode } from '$lib/client/canvas-engine';
 	import { FONT_FAMILIES, FONT_SIZES } from '$lib/client/canvas-engine';
+	import type { StrokeStyle, FillStyle, CornerRoundness } from '$lib/types';
 
 	interface Props {
 		engine: CanvasEngine | null;
@@ -27,10 +28,17 @@
 	let activeTool = $state<ToolMode>('select');
 	let activeColor = $state<string>('#f4f4f5');
 	let activeWidth = $state<number>(2);
+	let activeStrokeStyle = $state<StrokeStyle>('solid');
+	let activeFillStyle = $state<FillStyle>('solid');
+	let activeFillColor = $state<string>('transparent');
+	let activeRoundness = $state<CornerRoundness>('round');
+	let activeOpacity = $state<number>(1);
 	let activeFontFamily = $state<string>('sans');
 	let activeFontSize = $state<number>(18);
 	let activeArrowRouting = $state<'straight' | 'orthogonal'>('orthogonal');
 	let isTextShapeSelected = $state<boolean>(false);
+	let showFillMenu = $state<boolean>(false);
+	let showOpacityMenu = $state<boolean>(false);
 
 	const FONT_FAMILY_OPTIONS = [
 		{ label: 'Sans', value: 'sans', css: FONT_FAMILIES.sans },
@@ -41,6 +49,13 @@
 	function updateSelectedState() {
 		if (!engine || selectedCount === 0) {
 			isTextShapeSelected = false;
+			if (engine) {
+				activeStrokeStyle = engine.strokeStyle;
+				activeFillStyle = engine.fillStyle;
+				activeFillColor = engine.fillColor;
+				activeRoundness = engine.roundness;
+				activeOpacity = engine.opacity;
+			}
 			return;
 		}
 		const textShape = engine.selectedIds
@@ -53,6 +68,31 @@
 			}
 			if (textShape.data?.fontSize) {
 				activeFontSize = textShape.data.fontSize;
+			}
+		}
+
+		const firstSelected = engine.selectedIds.map((id) => engine.getShape(id)).find(Boolean);
+		if (firstSelected) {
+			if (firstSelected.stroke) {
+				activeColor = firstSelected.stroke;
+			}
+			if (firstSelected.strokeWidth) {
+				activeWidth = firstSelected.strokeWidth;
+			}
+			if (firstSelected.fill !== undefined) {
+				activeFillColor = firstSelected.fill;
+			}
+			if (firstSelected.data?.strokeStyle) {
+				activeStrokeStyle = firstSelected.data.strokeStyle;
+			}
+			if (firstSelected.data?.fillStyle) {
+				activeFillStyle = firstSelected.data.fillStyle;
+			}
+			if (firstSelected.data?.roundness) {
+				activeRoundness = firstSelected.data.roundness;
+			}
+			if (firstSelected.data?.opacity !== undefined) {
+				activeOpacity = firstSelected.data.opacity;
 			}
 		}
 	}
@@ -68,6 +108,11 @@
 			activeTool = engine.tool;
 			activeColor = engine.strokeColor;
 			activeWidth = engine.strokeWidth;
+			activeStrokeStyle = engine.strokeStyle;
+			activeFillStyle = engine.fillStyle;
+			activeFillColor = engine.fillColor;
+			activeRoundness = engine.roundness;
+			activeOpacity = engine.opacity;
 			activeFontFamily = engine.fontFamily;
 			activeFontSize = engine.fontSize;
 			activeArrowRouting = engine.arrowRouting;
@@ -80,8 +125,23 @@
 			engine.onStrokeColorChanged = (color) => {
 				activeColor = color;
 			};
+			engine.onFillColorChanged = (color) => {
+				activeFillColor = color;
+			};
 			engine.onStrokeWidthChanged = (width) => {
 				activeWidth = width;
+			};
+			engine.onStrokeStyleChanged = (style) => {
+				activeStrokeStyle = style;
+			};
+			engine.onFillStyleChanged = (style) => {
+				activeFillStyle = style;
+			};
+			engine.onRoundnessChanged = (roundness) => {
+				activeRoundness = roundness;
+			};
+			engine.onOpacityChanged = (opacity) => {
+				activeOpacity = opacity;
 			};
 			engine.onFontFamilyChanged = (family) => {
 				activeFontFamily = family;
@@ -129,6 +189,28 @@
 			(activeTool === 'select' && selectedCount === 0)
 	);
 
+	const isRectActive = $derived.by(() => {
+		if (activeTool === 'rectangle') return true;
+		if (!engine || selectedCount === 0) return false;
+		return engine.selectedIds.some((id) => {
+			const s = engine.getShape(id);
+			return s && s.type === 'rectangle';
+		});
+	});
+
+	const showFillControls = $derived.by(() => {
+		if (activeTool === 'rectangle' || activeTool === 'ellipse' || activeTool === 'diamond')
+			return true;
+		if (!engine || selectedCount === 0) return false;
+		return engine.selectedIds.some((id) => {
+			const s = engine.getShape(id);
+			return (
+				s &&
+				(s.type === 'rectangle' || s.type === 'ellipse' || (s.type === 'path' && s.data?.isDiamond))
+			);
+		});
+	});
+
 	const STROKE_COLORS = [
 		{ label: 'White', value: '#f4f4f5' },
 		{ label: 'Indigo', value: '#6366f1' },
@@ -136,6 +218,29 @@
 		{ label: 'Emerald', value: '#10b981' },
 		{ label: 'Amber', value: '#f59e0b' },
 		{ label: 'Rose', value: '#f43f5e' }
+	];
+
+	const FILL_COLORS = [
+		{ label: 'None', value: 'transparent' },
+		{ label: 'White', value: '#f4f4f5' },
+		{ label: 'Indigo', value: '#6366f1' },
+		{ label: 'Cyan', value: '#06b6d4' },
+		{ label: 'Emerald', value: '#10b981' },
+		{ label: 'Amber', value: '#f59e0b' },
+		{ label: 'Rose', value: '#f43f5e' }
+	];
+
+	const FILL_STYLES: { label: string; value: FillStyle }[] = [
+		{ label: 'Solid', value: 'solid' },
+		{ label: 'Hachure', value: 'hachure' },
+		{ label: 'Cross-hatch', value: 'cross-hatch' }
+	];
+
+	const OPACITY_PRESETS = [
+		{ label: '100%', value: 1 },
+		{ label: '75%', value: 0.75 },
+		{ label: '50%', value: 0.5 },
+		{ label: '25%', value: 0.25 }
 	];
 
 	const STROKE_WIDTHS = [
@@ -157,6 +262,31 @@
 	function setWidth(w: number) {
 		activeWidth = w;
 		engine?.setStrokeWidth(w);
+	}
+
+	function setStrokeStyle(style: StrokeStyle) {
+		activeStrokeStyle = style;
+		engine?.setStrokeStyle(style);
+	}
+
+	function setFillStyle(style: FillStyle) {
+		activeFillStyle = style;
+		engine?.setFillStyle(style);
+	}
+
+	function setFillColor(color: string) {
+		activeFillColor = color;
+		engine?.setFillColor(color);
+	}
+
+	function setRoundness(roundness: CornerRoundness) {
+		activeRoundness = roundness;
+		engine?.setRoundness(roundness);
+	}
+
+	function setOpacity(opacity: number) {
+		activeOpacity = opacity;
+		engine?.setOpacity(opacity);
 	}
 
 	function setFontFamily(family: string) {
@@ -474,6 +604,242 @@
 			</div>
 		{/if}
 
+		<!-- Stroke Style Selector (Solid, Dashed, Dotted) -->
+		{#if showStrokeWidth}
+			<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
+			<div class="flex items-center gap-0.5">
+				<button
+					onclick={() => setStrokeStyle('solid')}
+					class="flex items-center justify-center rounded p-1.5 text-xs transition-colors focus:outline-none {activeStrokeStyle ===
+					'solid'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:text-(--ink-1)'}"
+					title="Solid stroke"
+					aria-label="Solid stroke"
+				>
+					<svg
+						class="h-3.5 w-4"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<line x1="1" y1="8" x2="15" y2="8" />
+					</svg>
+				</button>
+				<button
+					onclick={() => setStrokeStyle('dashed')}
+					class="flex items-center justify-center rounded p-1.5 text-xs transition-colors focus:outline-none {activeStrokeStyle ===
+					'dashed'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:text-(--ink-1)'}"
+					title="Dashed stroke"
+					aria-label="Dashed stroke"
+				>
+					<svg
+						class="h-3.5 w-4"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-dasharray="3 2"
+					>
+						<line x1="1" y1="8" x2="15" y2="8" />
+					</svg>
+				</button>
+				<button
+					onclick={() => setStrokeStyle('dotted')}
+					class="flex items-center justify-center rounded p-1.5 text-xs transition-colors focus:outline-none {activeStrokeStyle ===
+					'dotted'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:text-(--ink-1)'}"
+					title="Dotted stroke"
+					aria-label="Dotted stroke"
+				>
+					<svg
+						class="h-3.5 w-4"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-dasharray="1 2.5"
+						stroke-linecap="round"
+					>
+						<line x1="1" y1="8" x2="15" y2="8" />
+					</svg>
+				</button>
+			</div>
+		{/if}
+
+		<!-- Fill Color & Pattern Popover -->
+		{#if showFillControls}
+			<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
+			<div class="relative">
+				<button
+					onclick={() => {
+						showFillMenu = !showFillMenu;
+						showOpacityMenu = false;
+						showExportMenu = false;
+					}}
+					class="flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs transition-colors focus:outline-none {showFillMenu
+						? 'bg-(--surface-2) font-medium text-(--ink-1)'
+						: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+					title="Fill color and pattern"
+					aria-label="Fill options"
+				>
+					<span class="text-[11px] font-medium">Fill</span>
+					<span
+						class="relative flex h-3.5 w-3.5 items-center justify-center overflow-hidden rounded-xs border border-(--surface-2)"
+						style="background-color: {activeFillColor === 'transparent'
+							? 'transparent'
+							: activeFillColor};"
+					>
+						{#if activeFillColor === 'transparent'}
+							<span class="h-[1px] w-4 rotate-45 bg-rose-400"></span>
+						{:else if activeFillStyle === 'hachure'}
+							<svg class="absolute inset-0 h-full w-full" viewBox="0 0 14 14">
+								<line x1="0" y1="14" x2="14" y2="0" stroke="rgba(0,0,0,0.45)" stroke-width="1.5" />
+							</svg>
+						{:else if activeFillStyle === 'cross-hatch'}
+							<svg class="absolute inset-0 h-full w-full" viewBox="0 0 14 14">
+								<line x1="0" y1="14" x2="14" y2="0" stroke="rgba(0,0,0,0.45)" stroke-width="1.5" />
+								<line x1="0" y1="0" x2="14" y2="14" stroke="rgba(0,0,0,0.45)" stroke-width="1.5" />
+							</svg>
+						{/if}
+					</span>
+				</button>
+
+				{#if showFillMenu}
+					<!-- svelte-ignore a11y_click_events_have_key_events -->
+					<!-- svelte-ignore a11y_no_static_element_interactions -->
+					<div
+						class="fixed inset-0 z-20 cursor-default bg-transparent"
+						onclick={() => (showFillMenu = false)}
+					></div>
+					<div
+						class="absolute bottom-full left-0 z-30 mb-3 w-56 rounded-xl border border-(--surface-2) bg-(--surface-1) p-2.5 shadow-2xl backdrop-blur-md"
+					>
+						<div class="mb-1.5 text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
+							Fill Color
+						</div>
+						<div class="mb-3 flex items-center gap-1.5">
+							{#each FILL_COLORS as fc}
+								<button
+									onclick={() => setFillColor(fc.value)}
+									class="flex h-5 w-5 items-center justify-center rounded-full transition-transform focus:outline-none {activeFillColor ===
+									fc.value
+										? 'scale-110 ring-2 ring-[#6366f1]'
+										: 'hover:scale-105'} {fc.value === 'transparent'
+										? 'border border-(--surface-2) bg-transparent'
+										: ''}"
+									style={fc.value !== 'transparent' ? `background-color: ${fc.value};` : ''}
+									title={fc.label}
+									aria-label="{fc.label} fill color"
+								>
+									{#if fc.value === 'transparent'}
+										<span class="h-[1px] w-3.5 rotate-45 bg-rose-400"></span>
+									{:else if activeFillColor === fc.value}
+										<span class="h-1.5 w-1.5 rounded-full bg-black/50"></span>
+									{/if}
+								</button>
+							{/each}
+						</div>
+
+						<div class="mb-1.5 text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase">
+							Fill Pattern
+						</div>
+						<div class="flex items-center gap-1">
+							{#each FILL_STYLES as fs}
+								<button
+									onclick={() => setFillStyle(fs.value)}
+									class="flex flex-1 items-center justify-center gap-1 rounded px-2 py-1 text-xs transition-colors focus:outline-none {activeFillStyle ===
+									fs.value
+										? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+										: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+									title="{fs.label} pattern"
+								>
+									{#if fs.value === 'solid'}
+										<span class="h-2.5 w-2.5 rounded-xs bg-current"></span>
+									{:else if fs.value === 'hachure'}
+										<svg
+											class="h-3 w-3"
+											viewBox="0 0 12 12"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.5"
+										>
+											<line x1="1" y1="11" x2="11" y2="1" />
+											<line x1="1" y1="6" x2="6" y2="1" />
+											<line x1="6" y1="11" x2="11" y2="6" />
+										</svg>
+									{:else if fs.value === 'cross-hatch'}
+										<svg
+											class="h-3 w-3"
+											viewBox="0 0 12 12"
+											fill="none"
+											stroke="currentColor"
+											stroke-width="1.5"
+										>
+											<line x1="1" y1="11" x2="11" y2="1" />
+											<line x1="1" y1="6" x2="6" y2="1" />
+											<line x1="6" y1="11" x2="11" y2="6" />
+											<line x1="1" y1="6" x2="6" y2="11" />
+										</svg>
+									{/if}
+									<span class="text-[10px]">{fs.label}</span>
+								</button>
+							{/each}
+						</div>
+					</div>
+				{/if}
+			</div>
+		{/if}
+
+		<!-- Corner Roundness (Sharp vs Round for rectangles) -->
+		{#if isRectActive}
+			<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
+			<div class="flex items-center gap-0.5">
+				<button
+					onclick={() => setRoundness('sharp')}
+					class="flex items-center justify-center rounded p-1.5 text-xs transition-colors focus:outline-none {activeRoundness ===
+					'sharp'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:text-(--ink-1)'}"
+					title="Sharp corners (90°)"
+					aria-label="Sharp corners"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<polyline points="3,13 3,3 13,3" />
+					</svg>
+				</button>
+				<button
+					onclick={() => setRoundness('round')}
+					class="flex items-center justify-center rounded p-1.5 text-xs transition-colors focus:outline-none {activeRoundness ===
+					'round'
+						? 'bg-(--surface-2) font-medium text-(--ink-1) ring-1 ring-[#6366f1]'
+						: 'text-(--ink-2) hover:text-(--ink-1)'}"
+					title="Rounded corners"
+					aria-label="Rounded corners"
+				>
+					<svg
+						class="h-3.5 w-3.5"
+						viewBox="0 0 16 16"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M3 13V7a4 4 0 0 1 4-4h6" />
+					</svg>
+				</button>
+			</div>
+		{/if}
+
 		<!-- Arrow Routing Selector (Straight vs Elbow) -->
 		{#if isArrowActive}
 			<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
@@ -564,6 +930,77 @@
 				{/each}
 			</div>
 		{/if}
+
+		<!-- Opacity Popover -->
+		<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
+		<div class="relative">
+			<button
+				onclick={() => {
+					showOpacityMenu = !showOpacityMenu;
+					showFillMenu = false;
+					showExportMenu = false;
+				}}
+				class="flex items-center gap-1 rounded-lg px-2 py-1 text-xs transition-colors focus:outline-none {showOpacityMenu
+					? 'bg-(--surface-2) font-medium text-(--ink-1)'
+					: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+				title="Opacity ({Math.round(activeOpacity * 100)}%)"
+				aria-label="Opacity options"
+			>
+				<svg
+					class="h-3.5 w-3.5 text-(--ink-2)"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<circle cx="12" cy="12" r="9" />
+					<path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" opacity={activeOpacity} />
+				</svg>
+				<span class="font-mono text-[10px]">{Math.round(activeOpacity * 100)}%</span>
+			</button>
+
+			{#if showOpacityMenu}
+				<!-- svelte-ignore a11y_click_events_have_key_events -->
+				<!-- svelte-ignore a11y_no_static_element_interactions -->
+				<div
+					class="fixed inset-0 z-20 cursor-default bg-transparent"
+					onclick={() => (showOpacityMenu = false)}
+				></div>
+				<div
+					class="absolute bottom-full left-1/2 z-30 mb-3 w-40 -translate-x-1/2 rounded-xl border border-(--surface-2) bg-(--surface-1) p-2.5 shadow-2xl backdrop-blur-md"
+				>
+					<div
+						class="mb-1.5 flex items-center justify-between text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase"
+					>
+						<span>Opacity</span>
+						<span class="font-mono text-(--ink-1)">{Math.round(activeOpacity * 100)}%</span>
+					</div>
+					<input
+						type="range"
+						min="10"
+						max="100"
+						step="5"
+						value={Math.round(activeOpacity * 100)}
+						oninput={(e) => setOpacity(Number((e.target as HTMLInputElement).value) / 100)}
+						class="mb-2 h-1.5 w-full cursor-pointer accent-[#6366f1]"
+					/>
+					<div class="grid grid-cols-4 gap-1">
+						{#each OPACITY_PRESETS as op}
+							<button
+								onclick={() => setOpacity(op.value)}
+								class="rounded px-1 py-0.5 font-mono text-[10px] transition-colors focus:outline-none {Math.abs(
+									activeOpacity - op.value
+								) < 0.05
+									? 'bg-(--surface-2) font-bold text-(--ink-1) ring-1 ring-[#6366f1]'
+									: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+							>
+								{op.label}
+							</button>
+						{/each}
+					</div>
+				</div>
+			{/if}
+		</div>
 
 		<div class="mx-1 h-5 w-px bg-(--surface-2)"></div>
 

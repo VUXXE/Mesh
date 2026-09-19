@@ -47,7 +47,10 @@ console.log('\n--- 1. Testing Orthogonal (Elbow 90°) Path Calculation ---');
 	const startV = { x: 200, y: 100 };
 	const endV = { x: 400, y: 300 };
 	const pathV = calculateOrthogonalPath(startV, endV, 'bottom', 'top');
-	assert(pathV.length >= 4, `Vertical orthogonal path has at least 4 waypoints (got ${pathV.length})`);
+	assert(
+		pathV.length >= 4,
+		`Vertical orthogonal path has at least 4 waypoints (got ${pathV.length})`
+	);
 	for (let i = 0; i < pathV.length - 1; i++) {
 		const p1 = pathV[i];
 		const p2 = pathV[i + 1];
@@ -80,7 +83,12 @@ console.log('\n--- 2. Testing Smart Alignment Guides & Snapping ---');
 
 	// Dragged box near left edge of existing shape (200) within threshold (e.g. at 203)
 	const draggedNearLeft = { minX: 203, minY: 400, maxX: 303, maxY: 460, width: 100, height: 60 };
-	const resultLeft = calculateSnapAndGuides(draggedNearLeft, shapesMap.values(), new Set(['dragged_id']), 6);
+	const resultLeft = calculateSnapAndGuides(
+		draggedNearLeft,
+		shapesMap.values(),
+		new Set(['dragged_id']),
+		6
+	);
 
 	assert(resultLeft.dx === -3, `Snaps to left edge with dx = -3 (got ${resultLeft.dx})`);
 	assert(
@@ -124,7 +132,10 @@ console.log('\n--- 3. Testing Quick-Add Floating Handles ---');
 	};
 
 	const buttons = getQuickAddButtons(rect, 24);
-	assert(buttons.length === 4, `Quick-add produces exactly 4 cardinal buttons (got ${buttons.length})`);
+	assert(
+		buttons.length === 4,
+		`Quick-add produces exactly 4 cardinal buttons (got ${buttons.length})`
+	);
 
 	const rightBtn = buttons.find((b) => b.side === 'right');
 	const leftBtn = buttons.find((b) => b.side === 'left');
@@ -132,10 +143,19 @@ console.log('\n--- 3. Testing Quick-Add Floating Handles ---');
 	const bottomBtn = buttons.find((b) => b.side === 'bottom');
 
 	assert(Boolean(rightBtn && leftBtn && topBtn && bottomBtn), 'All 4 sides present');
-	assert(rightBtn!.x === 100 + 120 + 24, `Right button placed at distance 24 beyond right edge (${rightBtn!.x})`);
+	assert(
+		rightBtn!.x === 100 + 120 + 24,
+		`Right button placed at distance 24 beyond right edge (${rightBtn!.x})`
+	);
 	assert(rightBtn!.y === 100 + 40, `Right button centered vertically (${rightBtn!.y})`);
-	assert(leftBtn!.x === 100 - 24, `Left button placed at distance 24 beyond left edge (${leftBtn!.x})`);
-	assert(bottomBtn!.y === 100 + 80 + 24, `Bottom button placed at distance 24 beyond bottom edge (${bottomBtn!.y})`);
+	assert(
+		leftBtn!.x === 100 - 24,
+		`Left button placed at distance 24 beyond left edge (${leftBtn!.x})`
+	);
+	assert(
+		bottomBtn!.y === 100 + 80 + 24,
+		`Bottom button placed at distance 24 beyond bottom edge (${bottomBtn!.y})`
+	);
 }
 
 // 4. Mermaid Flowchart Parser Tests
@@ -162,20 +182,35 @@ flowchart LR
 
 	// Verify shape types
 	const diamond = nodes.find((n) => n.data?.text === 'Token Valid?');
-	assert(Boolean(diamond && diamond.type === 'path' && diamond.data?.isDiamond), 'Auth diamond node correctly identified');
+	assert(
+		Boolean(diamond && diamond.type === 'path' && diamond.data?.isDiamond),
+		'Auth diamond node correctly identified'
+	);
 
 	const serviceEllipse = nodes.find((n) => n.data?.text === 'Worker Service');
-	assert(Boolean(serviceEllipse && serviceEllipse.type === 'ellipse'), 'Service ([...]) node created as ellipse');
+	assert(
+		Boolean(serviceEllipse && serviceEllipse.type === 'ellipse'),
+		'Service ([...]) node created as ellipse'
+	);
 
 	const clientRect = nodes.find((n) => n.data?.text === 'Web Client');
-	assert(Boolean(clientRect && clientRect.type === 'rectangle'), 'Client [...] node created as rectangle');
+	assert(
+		Boolean(clientRect && clientRect.type === 'rectangle'),
+		'Client [...] node created as rectangle'
+	);
 
 	// Verify all arrows have orthogonal routing and bindings
 	for (const arrow of arrows) {
 		assert(arrow.type === 'path', 'Arrow is path shape');
 		assert(arrow.data?.routing === 'orthogonal', 'Arrow uses orthogonal routing');
-		assert(Array.isArray(arrow.data?.points) && arrow.data.points.length >= 2, 'Arrow has valid points');
-		assert(Boolean(arrow.data?.startAnchor && arrow.data?.endAnchor), 'Arrow has bound start and end anchors');
+		assert(
+			Array.isArray(arrow.data?.points) && arrow.data.points.length >= 2,
+			'Arrow has valid points'
+		);
+		assert(
+			Boolean(arrow.data?.startAnchor && arrow.data?.endAnchor),
+			'Arrow has bound start and end anchors'
+		);
 	}
 
 	// Verify empty / invalid input handling
