@@ -484,6 +484,68 @@
 		<!-- Action Buttons -->
 		<div class="flex items-center gap-1">
 			{#if selectedCount > 0}
+				<!-- Duplicate -->
+				<button
+					onclick={() => engine?.duplicateSelected()}
+					class="rounded-lg p-2 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+					title="Duplicate ({selectedCount}) [Ctrl+D / Cmd+D]"
+					aria-label="Duplicate selected items"
+				>
+					<svg
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+						<path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+					</svg>
+				</button>
+
+				<!-- Bring to Front -->
+				<button
+					onclick={() => engine?.bringToFront()}
+					class="rounded-lg p-2 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+					title="Bring to Front [Ctrl+] / Cmd+]]"
+					aria-label="Bring to front"
+				>
+					<svg
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="18 15 12 9 6 15" />
+						<line x1="6" y1="5" x2="18" y2="5" />
+					</svg>
+				</button>
+
+				<!-- Send to Back -->
+				<button
+					onclick={() => engine?.sendToBack()}
+					class="rounded-lg p-2 text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+					title="Send to Back [Ctrl+[ / Cmd+[]"
+					aria-label="Send to back"
+				>
+					<svg
+						class="h-4 w-4"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+						stroke-linecap="round"
+						stroke-linejoin="round"
+					>
+						<polyline points="6 9 12 15 18 9" />
+						<line x1="6" y1="19" x2="18" y2="19" />
+					</svg>
+				</button>
+
+				<!-- Delete -->
 				<button
 					onclick={handleDelete}
 					class="rounded-lg p-2 text-rose-400 transition-colors hover:bg-(--surface-2) hover:text-rose-300 focus:outline-none"

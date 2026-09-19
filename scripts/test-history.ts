@@ -110,6 +110,27 @@ async function runHistoryTests() {
 		throw new Error('Shape 1 should be deleted after redoing deletion');
 	}
 
+	// 4. Test Batch Create (Paste / Duplicate) and Undo/Redo
+	const s2 = createMockShape('shape_2', 50, 50);
+	const s3 = createMockShape('shape_3', 80, 80);
+	upsert([s2, s3]);
+	history.push({ type: 'batch_create', shapes: [s2, s3] });
+
+	// Undo batch_create
+	history.undo(upsert, del, clear);
+	if (localShapes.has('shape_2') || localShapes.has('shape_3')) {
+		throw new Error('Batch created shapes should be deleted after undo');
+	}
+
+	// Redo batch_create
+	history.redo(upsert, del, clear);
+	if (!localShapes.has('shape_2') || !localShapes.has('shape_3')) {
+		throw new Error('Batch created shapes should be restored after redo');
+	}
+	if (localShapes.get('shape_2')!.updatedAt <= s2.updatedAt) {
+		throw new Error('Redo batch_create must assign fresh updatedAt timestamps');
+	}
+
 	console.log('PASSED: All HistoryManager unit tests succeeded!\n');
 }
 
