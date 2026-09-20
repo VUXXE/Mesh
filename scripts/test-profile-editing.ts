@@ -41,7 +41,10 @@ if (
 console.log('✅ PASS: Live avatar & initials preview card implemented');
 
 // Check for input field & keyboard shortcuts
-if (!presenceBarCode.includes('profile-name-input') || !presenceBarCode.includes('handleProfileKeyDown')) {
+if (
+	!presenceBarCode.includes('profile-name-input') ||
+	!presenceBarCode.includes('handleProfileKeyDown')
+) {
 	throw new Error('FAIL: Name input or keyboard handlers missing in PresenceBar.svelte');
 }
 console.log('✅ PASS: Profile name input with Enter/Esc hotkeys implemented');
