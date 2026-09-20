@@ -616,7 +616,7 @@
 					{#each STROKE_COLORS as c}
 						<button
 							onclick={() => setColor(c.value)}
-							class="group relative flex h-6 w-6 items-center justify-center rounded border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeColor.toLowerCase() ===
+							class="group relative flex h-6 w-6 items-center justify-center rounded border border-black/15 shadow-2xs transition-all hover:scale-110 focus:outline-none active:scale-95 dark:border-white/20 {activeColor.toLowerCase() ===
 							c.value.toLowerCase()
 								? 'scale-105 ring-2 ring-[#6366f1] ring-offset-2 ring-offset-(--surface-1)'
 								: ''}"
@@ -667,7 +667,7 @@
 					>
 						<div class="flex items-center gap-1.5">
 							<span
-								class="h-3 w-3 rounded-full border border-white/20 shadow-xs"
+								class="h-3 w-3 rounded-full border border-black/20 shadow-xs dark:border-white/25"
 								style="background-color: {activeColor};"
 							></span>
 							<span class="font-mono text-[10px] font-medium text-(--ink-1) uppercase"
@@ -695,7 +695,7 @@
 						{#each FILL_COLORS as fc}
 							<button
 								onclick={() => setFillColor(fc.value)}
-								class="group relative flex h-6 w-6 items-center justify-center overflow-hidden rounded border border-white/10 transition-all hover:scale-110 focus:outline-none active:scale-95 {activeFillColor.toLowerCase() ===
+								class="group relative flex h-6 w-6 items-center justify-center overflow-hidden rounded border border-black/15 shadow-2xs transition-all hover:scale-110 focus:outline-none active:scale-95 dark:border-white/20 {activeFillColor.toLowerCase() ===
 								fc.value.toLowerCase()
 									? 'scale-105 ring-2 ring-[#6366f1] ring-offset-2 ring-offset-(--surface-1)'
 									: ''} {fc.value === 'transparent'
@@ -751,7 +751,7 @@
 						>
 							<div class="flex items-center gap-1.5">
 								<span
-									class="h-3 w-3 rounded-full border border-white/20 shadow-xs"
+									class="h-3 w-3 rounded-full border border-black/20 shadow-xs dark:border-white/25"
 									style="background-color: {activeFillColor};"
 								></span>
 								<span class="font-mono text-[10px] font-medium text-(--ink-1) uppercase"

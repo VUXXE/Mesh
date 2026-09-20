@@ -3,6 +3,7 @@ export type ShapeType = 'path' | 'rectangle' | 'ellipse' | 'text' | 'sticky_note
 export type StrokeStyle = 'solid' | 'dashed' | 'dotted';
 export type FillStyle = 'solid' | 'hachure' | 'cross-hatch';
 export type CornerRoundness = 'sharp' | 'round';
+export type GridMode = 'dots' | 'lines' | 'none';
 
 export interface PathPoint {
 	x: number;

@@ -114,6 +114,19 @@
 				return;
 			}
 
+			if (isMod && (e.key === "'" || e.key === '"')) {
+				e.preventDefault();
+				if (engine) {
+					if (engine.gridMode === 'none') {
+						engine.setGridMode('dots');
+						engine.setSnapToGrid(true);
+					} else {
+						engine.toggleSnapToGrid();
+					}
+				}
+				return;
+			}
+
 			if (!isMod && !e.altKey) {
 				if (e.key === ']') {
 					e.preventDefault();

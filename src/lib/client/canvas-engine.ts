@@ -1,6 +1,7 @@
 import type {
 	CornerRoundness,
 	FillStyle,
+	GridMode,
 	PathPoint,
 	PeerPresence,
 	ShapeRecord,
@@ -170,6 +171,10 @@ export class CanvasEngine implements InteractionHost {
 	opacity = 1;
 	fontSize = 18;
 	fontFamily = 'sans';
+	gridMode: GridMode = 'dots';
+	snapToGrid = false;
+	gridSpacing = 32;
+	snapStep = 16;
 
 	static readonly DARK_DEFAULT_STROKE = '#f4f4f5';
 	static readonly LIGHT_DEFAULT_STROKE = '#18181b';
@@ -239,8 +244,48 @@ export class CanvasEngine implements InteractionHost {
 	onTextShapeStyleChanged?: (shape: ShapeRecord) => void;
 	onStartTextEdit?: (shape: ShapeRecord) => void;
 	onEndTextEdit?: () => void;
+	onGridModeChanged?: (mode: GridMode) => void;
+	onSnapToGridChanged?: (snap: boolean) => void;
 
 	arrowRouting: 'straight' | 'orthogonal' = 'orthogonal';
+
+	setGridMode(mode: GridMode) {
+		this.gridMode = mode;
+		try {
+			if (typeof localStorage !== 'undefined') {
+				localStorage.setItem('mesh_grid_mode', mode);
+			}
+		} catch {
+			// Ignore storage errors
+		}
+		this.onGridModeChanged?.(mode);
+		this.renderBuffer();
+	}
+
+	setSnapToGrid(snap: boolean) {
+		this.snapToGrid = snap;
+		try {
+			if (typeof localStorage !== 'undefined') {
+				localStorage.setItem('mesh_snap_to_grid', snap ? 'true' : 'false');
+			}
+		} catch {
+			// Ignore storage errors
+		}
+		this.onSnapToGridChanged?.(snap);
+	}
+
+	toggleGridMode() {
+		const next: Record<GridMode, GridMode> = {
+			dots: 'lines',
+			lines: 'none',
+			none: 'dots'
+		};
+		this.setGridMode(next[this.gridMode] ?? 'dots');
+	}
+
+	toggleSnapToGrid() {
+		this.setSnapToGrid(!this.snapToGrid);
+	}
 
 	private toolChangedListeners: ((tool: ToolMode) => void)[] = [];
 	private selectionListeners: ((selectedIds: string[]) => void)[] = [];
@@ -271,6 +316,21 @@ export class CanvasEngine implements InteractionHost {
 			if (e.code === 'Space') this.isSpacePressed = false;
 			if (e.key === 'Shift') this.isShiftPressed = false;
 		});
+
+		try {
+			if (typeof localStorage !== 'undefined') {
+				const savedGridMode = localStorage.getItem('mesh_grid_mode') as GridMode | null;
+				if (savedGridMode === 'dots' || savedGridMode === 'lines' || savedGridMode === 'none') {
+					this.gridMode = savedGridMode;
+				}
+				const savedSnap = localStorage.getItem('mesh_snap_to_grid');
+				if (savedSnap !== null) {
+					this.snapToGrid = savedSnap === 'true';
+				}
+			}
+		} catch {
+			// Ignore localStorage errors (private browsing, etc.)
+		}
 
 		this.resize();
 	}
@@ -1506,7 +1566,8 @@ export class CanvasEngine implements InteractionHost {
 			this.viewport.zoom,
 			this.isLightTheme(),
 			width,
-			height
+			height,
+			this.gridMode
 		);
 
 		const sorted = Array.from(this.shapes.values()).sort((a, b) => a.zIndex - b.zIndex);
