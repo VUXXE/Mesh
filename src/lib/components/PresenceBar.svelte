@@ -114,11 +114,29 @@
 </script>
 
 <div class="fixed top-4 right-4 z-20 flex items-center gap-2 select-none">
-	<!-- Room ID & Copy Options Pill -->
+	<!-- 1. Room & Share Pill (Integrated Live status + Room code + Share button) -->
 	<div
-		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 shadow-lg backdrop-blur-md"
+		class="flex h-9 items-center gap-2 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 shadow-lg backdrop-blur-md"
 	>
-		<span class="text-xs text-(--ink-2)">Room:</span>
+		<!-- Integrated Connection Status Dot -->
+		<div
+			class="flex items-center"
+			title="Status: {status === 'connected'
+				? 'Live sync'
+				: status === 'reconnecting'
+					? 'Reconnecting...'
+					: 'Offline'}"
+		>
+			{#if status === 'connected'}
+				<span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500 shadow-xs"></span>
+			{:else if status === 'connecting' || status === 'reconnecting'}
+				<span class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500 shadow-xs"></span>
+			{:else}
+				<span class="h-2 w-2 shrink-0 rounded-full bg-rose-500 shadow-xs"></span>
+			{/if}
+		</div>
+
+		<!-- Password Lock indicator if protected -->
 		{#if locked}
 			<svg
 				class="h-3.5 w-3.5 shrink-0 text-amber-300"
@@ -127,52 +145,62 @@
 				stroke="currentColor"
 				stroke-width="2"
 			>
-				<title>Password protected</title>
+				<title>Password protected room</title>
 				<rect x="3" y="11" width="18" height="11" rx="2" />
 				<path d="M7 11V7a5 5 0 0 1 10 0v4" />
 			</svg>
 		{/if}
+
+		<!-- Clickable Room Code (copies code) -->
 		<button
 			onclick={copyRoomCode}
 			class="font-mono text-xs font-semibold text-(--ink-1) transition-colors hover:text-[#6366f1] focus:outline-none"
-			title="Click to copy code"
+			title="Click to copy room code ({roomId})"
 		>
-			{roomId}
+			{copiedCode ? 'Copied!' : roomId}
 		</button>
-		<div class="mx-0.5 h-3.5 w-px bg-(--surface-2)"></div>
-		<button
-			onclick={copyRoomCode}
-			class="flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors focus:outline-none {copiedCode
-				? 'bg-emerald-500/20 text-emerald-300'
-				: 'bg-(--surface-2) text-(--ink-2) hover:text-(--ink-1)'}"
-			title="Copy room code only ({roomId})"
-		>
-			{copiedCode ? 'Code Copied!' : 'Copy Code'}
-		</button>
+
+		<div class="h-3.5 w-px bg-(--surface-2)"></div>
+
+		<!-- Clean One-Click Share Button (copies link) -->
 		<button
 			onclick={copyRoomLink}
-			class="flex h-6 items-center rounded px-2 text-[11px] font-medium transition-colors focus:outline-none {copiedLink
+			class="flex h-6 items-center gap-1 rounded-md px-2 text-xs font-medium transition-all focus:outline-none {copiedLink
 				? 'bg-emerald-500/20 text-emerald-300'
-				: 'bg-(--surface-2) text-(--ink-2) hover:text-(--ink-1)'}"
-			title="Copy full invite link"
+				: 'bg-[#6366f1]/15 text-[#818cf8] hover:bg-[#6366f1]/25 hover:text-white'}"
+			title="Copy invite link to clipboard"
 		>
-			{copiedLink ? 'Link Copied!' : 'Copy Link'}
+			<svg class="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+				{#if copiedLink}
+					<polyline points="20 6 9 17 4 12" />
+				{:else}
+					<circle cx="18" cy="5" r="3" />
+					<circle cx="6" cy="12" r="3" />
+					<circle cx="18" cy="19" r="3" />
+					<line x1="8.59" y1="13.51" x2="15.42" y2="17.49" />
+					<line x1="15.41" y1="6.51" x2="8.59" y2="10.49" />
+				{/if}
+			</svg>
+			<span>{copiedLink ? 'Copied' : 'Share'}</span>
 		</button>
 	</div>
 
-	<!-- Grid Mode Dropdown -->
-	<div class="relative">
+	<!-- 2. Canvas View Controls (Unified Grid Mode + Theme Toggle Pill) -->
+	<div
+		class="relative flex h-9 items-center rounded-lg border border-(--surface-2) bg-(--surface-1) p-0.5 shadow-lg backdrop-blur-md"
+	>
+		<!-- Grid Mode Button -->
 		<button
 			onclick={() => (showGridMenu = !showGridMenu)}
-			class="flex h-9 w-9 items-center justify-center rounded-lg border border-(--surface-2) bg-(--surface-1) shadow-lg backdrop-blur-md transition-colors focus:outline-none {showGridMenu ||
+			class="flex h-8 w-8 items-center justify-center rounded-md transition-colors focus:outline-none {showGridMenu ||
 			gridMode !== 'none'
-				? 'text-[#6366f1]'
-				: 'text-(--ink-2) hover:text-(--ink-1)'}"
-			title="Grid Mode: {gridMode} {snapToGrid ? '(Snap On)' : ''}"
-			aria-label="Grid Mode settings"
+				? 'bg-(--surface-2) text-[#6366f1]'
+				: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+			title="Grid: {gridMode} {snapToGrid ? '(Snap On)' : ''}"
+			aria-label="Grid settings"
 		>
 			{#if gridMode === 'dots'}
-				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+				<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
 					<circle cx="5" cy="5" r="1.5" />
 					<circle cx="12" cy="5" r="1.5" />
 					<circle cx="19" cy="5" r="1.5" />
@@ -184,19 +212,72 @@
 					<circle cx="19" cy="19" r="1.5" />
 				</svg>
 			{:else if gridMode === 'lines'}
-				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					class="h-3.5 w-3.5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<rect x="3" y="3" width="18" height="18" rx="2" />
 					<line x1="3" y1="12" x2="21" y2="12" />
 					<line x1="12" y1="3" x2="12" y2="21" />
 				</svg>
 			{:else}
-				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<svg
+					class="h-3.5 w-3.5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
 					<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 3" />
 					<line x1="4" y1="4" x2="20" y2="20" />
 				</svg>
 			{/if}
 		</button>
 
+		<div class="h-4 w-px bg-(--surface-2)"></div>
+
+		<!-- Theme Toggle Button -->
+		<button
+			onclick={toggleTheme}
+			class="flex h-8 w-8 items-center justify-center rounded-md text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+			title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+			aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
+		>
+			{#if isLight}
+				<svg
+					class="h-3.5 w-3.5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<circle cx="12" cy="12" r="4" />
+					<path d="M12 2v2" />
+					<path d="M12 20v2" />
+					<path d="M4.93 4.93l1.41 1.41" />
+					<path d="M17.66 17.66l1.41 1.41" />
+					<path d="M2 12h2" />
+					<path d="M20 12h2" />
+					<path d="M6.34 17.66l-1.41 1.41" />
+					<path d="M19.07 4.93l-1.41 1.41" />
+				</svg>
+			{:else}
+				<svg
+					class="h-3.5 w-3.5"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+				</svg>
+			{/if}
+		</button>
+
+		<!-- Grid Popover Dropdown -->
 		{#if showGridMenu}
 			<button
 				type="button"
@@ -335,52 +416,9 @@
 		{/if}
 	</div>
 
-	<!-- Theme Toggle -->
-	<button
-		onclick={toggleTheme}
-		class="flex h-9 w-9 items-center justify-center rounded-lg border border-(--surface-2) bg-(--surface-1) text-(--ink-2) shadow-lg backdrop-blur-md transition-colors hover:text-(--ink-1) focus:outline-none"
-		title={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-		aria-label={isLight ? 'Switch to dark mode' : 'Switch to light mode'}
-	>
-		{#if isLight}
-			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<circle cx="12" cy="12" r="4" />
-				<path d="M12 2v2" />
-				<path d="M12 20v2" />
-				<path d="M4.93 4.93l1.41 1.41" />
-				<path d="M17.66 17.66l1.41 1.41" />
-				<path d="M2 12h2" />
-				<path d="M20 12h2" />
-				<path d="M6.34 17.66l-1.41 1.41" />
-				<path d="M19.07 4.93l-1.41 1.41" />
-			</svg>
-		{:else}
-			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-				<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
-			</svg>
-		{/if}
-	</button>
-
-	<!-- Connection Status Indicator -->
+	<!-- 3. Collaboration & Presence Pill (Peers + You) -->
 	<div
-		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-3 shadow-lg backdrop-blur-md"
-	>
-		{#if status === 'connected'}
-			<span class="h-2 w-2 shrink-0 rounded-full bg-emerald-500" title="Connected"></span>
-			<span class="text-xs font-medium text-emerald-400">Live</span>
-		{:else if status === 'connecting' || status === 'reconnecting'}
-			<span class="h-2 w-2 shrink-0 animate-pulse rounded-full bg-amber-500" title="Connecting..."
-			></span>
-			<span class="text-xs font-medium text-amber-400">Reconnecting...</span>
-		{:else}
-			<span class="h-2 w-2 shrink-0 rounded-full bg-rose-500" title="Disconnected"></span>
-			<span class="text-xs font-medium text-rose-400">Offline</span>
-		{/if}
-	</div>
-
-	<!-- Peers & User Pill -->
-	<div
-		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2.5 shadow-lg backdrop-blur-md"
+		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2 shadow-lg backdrop-blur-md"
 	>
 		<!-- Connected Peer Avatars -->
 		{#if peers.length > 0}
@@ -395,12 +433,13 @@
 					</div>
 				{/each}
 			</div>
+			<div class="mx-0.5 h-3.5 w-px bg-(--surface-2)"></div>
 		{/if}
 
 		<!-- Local Current User Pill -->
-		<div class="flex items-center gap-1.5 {peers.length > 0 ? 'pl-0.5' : ''}">
+		<div class="flex items-center gap-1.5">
 			<div
-				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-white/20 text-[10px] font-bold text-black"
+				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/15 text-[10px] font-bold text-black shadow-2xs dark:border-white/20"
 				style="background-color: {currentUser.color};"
 			>
 				{getInitials(currentUser.name)}
@@ -412,12 +451,12 @@
 					bind:value={nameInput}
 					onblur={saveName}
 					onkeydown={handleKeyDown}
-					class="h-6 w-24 rounded border border-[#6366f1] bg-(--surface-2) px-1.5 text-xs text-(--ink-1) focus:outline-none"
+					class="h-6 w-20 rounded border border-[#6366f1] bg-(--surface-2) px-1.5 text-xs text-(--ink-1) focus:outline-none"
 				/>
 			{:else}
 				<button
 					onclick={() => (isEditingName = true)}
-					class="max-w-[100px] truncate text-xs text-(--ink-1) transition-colors hover:text-[#6366f1] focus:outline-none"
+					class="max-w-[80px] truncate text-xs font-medium text-(--ink-1) transition-colors hover:text-[#6366f1] focus:outline-none"
 					title="Click to edit your display name"
 				>
 					{currentUser.name}
