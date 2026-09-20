@@ -107,12 +107,12 @@ class MockGridCanvasContext {
 // Test 6: Check Toolbar.svelte for swatch borders
 {
 	const toolbar = readFileSync(resolve(__dirname, '../src/lib/components/Toolbar.svelte'), 'utf-8');
-	if (!toolbar.includes('border-black/15') || !toolbar.includes('dark:border-white/20')) {
-		console.error('❌ FAIL: Toolbar.svelte does not include theme-aware border on swatches');
+	if (!toolbar.includes('border-black/40') || !toolbar.includes('dark:border-white/30')) {
+		console.error('❌ FAIL: Toolbar.svelte does not include high-contrast border on swatches');
 		process.exit(1);
 	}
 	console.log(
-		'✅ PASS: Toolbar.svelte contains border-black/15 and dark:border-white/20 on swatches'
+		'✅ PASS: Toolbar.svelte contains high-contrast border-black/40 and dark:border-white/30 on swatches'
 	);
 }
 
