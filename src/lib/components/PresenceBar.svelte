@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { CurrentUser, ConnectionStatus } from '$lib/client/websocket.svelte';
-	import type { PeerPresence } from '$lib/types';
+	import type { GridMode, PeerPresence } from '$lib/types';
 	import type { CanvasEngine } from '$lib/client/canvas-engine';
 
 	interface Props {
@@ -37,6 +37,23 @@
 		}
 		engine?.applyTheme();
 	}
+
+	let showGridMenu = $state(false);
+	let gridMode = $state<GridMode>('dots');
+	let snapToGrid = $state(false);
+
+	$effect(() => {
+		if (engine) {
+			gridMode = engine.gridMode;
+			snapToGrid = engine.snapToGrid;
+			engine.onGridModeChanged = (mode) => {
+				gridMode = mode;
+			};
+			engine.onSnapToGridChanged = (snap) => {
+				snapToGrid = snap;
+			};
+		}
+	});
 
 	$effect(() => {
 		if (engine && typeof document !== 'undefined') {
@@ -141,6 +158,181 @@
 		>
 			{copiedLink ? 'Link Copied!' : 'Copy Link'}
 		</button>
+	</div>
+
+	<!-- Grid Mode Dropdown -->
+	<div class="relative">
+		<button
+			onclick={() => (showGridMenu = !showGridMenu)}
+			class="flex h-9 w-9 items-center justify-center rounded-lg border border-(--surface-2) bg-(--surface-1) shadow-lg backdrop-blur-md transition-colors focus:outline-none {showGridMenu ||
+			gridMode !== 'none'
+				? 'text-[#6366f1]'
+				: 'text-(--ink-2) hover:text-(--ink-1)'}"
+			title="Grid Mode: {gridMode} {snapToGrid ? '(Snap On)' : ''}"
+			aria-label="Grid Mode settings"
+		>
+			{#if gridMode === 'dots'}
+				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+					<circle cx="5" cy="5" r="1.5" />
+					<circle cx="12" cy="5" r="1.5" />
+					<circle cx="19" cy="5" r="1.5" />
+					<circle cx="5" cy="12" r="1.5" />
+					<circle cx="12" cy="12" r="1.5" />
+					<circle cx="19" cy="12" r="1.5" />
+					<circle cx="5" cy="19" r="1.5" />
+					<circle cx="12" cy="19" r="1.5" />
+					<circle cx="19" cy="19" r="1.5" />
+				</svg>
+			{:else if gridMode === 'lines'}
+				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<rect x="3" y="3" width="18" height="18" rx="2" />
+					<line x1="3" y1="12" x2="21" y2="12" />
+					<line x1="12" y1="3" x2="12" y2="21" />
+				</svg>
+			{:else}
+				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+					<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 3" />
+					<line x1="4" y1="4" x2="20" y2="20" />
+				</svg>
+			{/if}
+		</button>
+
+		{#if showGridMenu}
+			<button
+				type="button"
+				class="fixed inset-0 z-40 cursor-default bg-transparent focus:outline-none"
+				onclick={() => (showGridMenu = false)}
+				tabindex="-1"
+				aria-label="Close grid menu"
+			></button>
+
+			<div
+				class="absolute top-full right-0 z-50 mt-2 w-52 rounded-lg border border-(--surface-2) bg-(--surface-1) p-2.5 shadow-xl backdrop-blur-md"
+			>
+				<div class="mb-2 flex items-center justify-between px-1">
+					<span class="text-[10px] font-semibold tracking-wider text-(--ink-3) uppercase"
+						>Canvas Grid</span
+					>
+					<span class="font-mono text-[9px] text-(--ink-2) capitalize">{gridMode}</span>
+				</div>
+
+				<!-- 3-Segment Grid Pattern Selector -->
+				<div
+					class="grid grid-cols-3 gap-1 rounded-md border border-(--surface-2) bg-(--surface-0)/80 p-1"
+				>
+					<button
+						onclick={() => {
+							engine?.setGridMode('dots');
+							gridMode = 'dots';
+						}}
+						class="flex flex-col items-center gap-1 rounded py-1.5 text-[10px] font-medium transition-colors focus:outline-none {gridMode ===
+						'dots'
+							? 'bg-[#6366f1] text-white shadow-xs'
+							: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+						title="Dot matrix grid"
+					>
+						<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor">
+							<circle cx="6" cy="6" r="2" />
+							<circle cx="18" cy="6" r="2" />
+							<circle cx="6" cy="18" r="2" />
+							<circle cx="18" cy="18" r="2" />
+						</svg>
+						<span>Dots</span>
+					</button>
+
+					<button
+						onclick={() => {
+							engine?.setGridMode('lines');
+							gridMode = 'lines';
+						}}
+						class="flex flex-col items-center gap-1 rounded py-1.5 text-[10px] font-medium transition-colors focus:outline-none {gridMode ===
+						'lines'
+							? 'bg-[#6366f1] text-white shadow-xs'
+							: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+						title="Squared lines grid (graph paper)"
+					>
+						<svg
+							class="h-3.5 w-3.5"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<rect x="3" y="3" width="18" height="18" rx="2" />
+							<line x1="3" y1="12" x2="21" y2="12" />
+							<line x1="12" y1="3" x2="12" y2="21" />
+						</svg>
+						<span>Lines</span>
+					</button>
+
+					<button
+						onclick={() => {
+							engine?.setGridMode('none');
+							gridMode = 'none';
+						}}
+						class="flex flex-col items-center gap-1 rounded py-1.5 text-[10px] font-medium transition-colors focus:outline-none {gridMode ===
+						'none'
+							? 'bg-[#6366f1] text-white shadow-xs'
+							: 'text-(--ink-2) hover:bg-(--surface-2) hover:text-(--ink-1)'}"
+						title="Clean blank canvas"
+					>
+						<svg
+							class="h-3.5 w-3.5"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<rect x="4" y="4" width="16" height="16" rx="2" stroke-dasharray="3 3" />
+							<line x1="4" y1="4" x2="20" y2="20" />
+						</svg>
+						<span>None</span>
+					</button>
+				</div>
+
+				<div class="my-2 h-px bg-(--surface-2)"></div>
+
+				<!-- Snap to Grid Toggle -->
+				<button
+					onclick={() => {
+						const nextSnap = !snapToGrid;
+						engine?.setSnapToGrid(nextSnap);
+						snapToGrid = nextSnap;
+					}}
+					class="flex w-full items-center justify-between rounded px-2 py-1.5 text-xs text-(--ink-1) transition-colors hover:bg-(--surface-2)"
+				>
+					<div class="flex items-center gap-2">
+						<svg
+							class="h-3.5 w-3.5 text-indigo-400"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M6 3v7a6 6 0 0 0 12 0V3" />
+							<line x1="4" y1="7" x2="8" y2="7" />
+							<line x1="16" y1="7" x2="20" y2="7" />
+						</svg>
+						<span class="font-medium">Snap to Grid</span>
+					</div>
+					<div
+						class="flex h-4 w-7 items-center rounded-full p-0.5 transition-colors {snapToGrid
+							? 'justify-end bg-[#6366f1]'
+							: 'justify-start bg-(--surface-3)'}"
+					>
+						<div class="h-3 w-3 rounded-full bg-white shadow-xs"></div>
+					</div>
+				</button>
+
+				<div class="mt-1.5 flex items-center justify-between px-1 text-[10px] text-(--ink-3)">
+					<span>Shortcut</span>
+					<kbd
+						class="rounded border border-(--surface-3) bg-(--surface-0) px-1.5 py-0.5 font-mono text-[9px] text-(--ink-2)"
+						>Ctrl + '</kbd
+					>
+				</div>
+			</div>
+		{/if}
 	</div>
 
 	<!-- Theme Toggle -->

@@ -12,6 +12,7 @@ import { getFontFamilyCss, wrapText } from './canvas-text';
 import type {
 	CornerRoundness,
 	FillStyle,
+	GridMode,
 	PathPoint,
 	PeerPresence,
 	ShapeRecord,
@@ -382,24 +383,50 @@ export function renderGrid(
 	zoom: number,
 	isLightTheme: boolean,
 	width: number,
-	height: number
+	height: number,
+	gridMode: GridMode = 'dots'
 ) {
-	const dotSpacing = 32;
+	if (gridMode === 'none') return;
+
+	let spacing = 32;
+	if (zoom < 0.2) {
+		spacing = 128;
+	} else if (zoom < 0.45) {
+		spacing = 64;
+	}
 
 	const startWorld = screenToWorld(0, 0, panX, panY, zoom);
 	const endWorld = screenToWorld(width, height, panX, panY, zoom);
 
-	const startX = Math.floor(startWorld.x / dotSpacing) * dotSpacing;
-	const startY = Math.floor(startWorld.y / dotSpacing) * dotSpacing;
+	const startX = Math.floor(startWorld.x / spacing) * spacing;
+	const startY = Math.floor(startWorld.y / spacing) * spacing;
 
 	ctx.save();
-	ctx.fillStyle = isLightTheme ? '#d4d4d8' : '#27272a';
 
-	for (let x = startX; x <= endWorld.x; x += dotSpacing) {
-		for (let y = startY; y <= endWorld.y; y += dotSpacing) {
-			ctx.fillRect(x, y, 1.5, 1.5);
+	if (gridMode === 'lines') {
+		ctx.strokeStyle = isLightTheme ? 'rgba(0, 0, 0, 0.08)' : 'rgba(255, 255, 255, 0.07)';
+		ctx.lineWidth = 1 / zoom;
+		ctx.beginPath();
+		for (let x = startX; x <= endWorld.x; x += spacing) {
+			ctx.moveTo(x, startWorld.y);
+			ctx.lineTo(x, endWorld.y);
+		}
+		for (let y = startY; y <= endWorld.y; y += spacing) {
+			ctx.moveTo(startWorld.x, y);
+			ctx.lineTo(endWorld.x, y);
+		}
+		ctx.stroke();
+	} else {
+		// gridMode === 'dots'
+		ctx.fillStyle = isLightTheme ? '#a1a1aa' : '#2e2e33';
+		const dotSize = Math.max(1.75, 1.75 / Math.min(zoom, 1));
+		for (let x = startX; x <= endWorld.x; x += spacing) {
+			for (let y = startY; y <= endWorld.y; y += spacing) {
+				ctx.fillRect(x - dotSize / 2, y - dotSize / 2, dotSize, dotSize);
+			}
 		}
 	}
+
 	ctx.restore();
 }
 

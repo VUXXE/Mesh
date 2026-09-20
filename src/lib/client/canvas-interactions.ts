@@ -79,6 +79,8 @@ export interface InteractionHost {
 	onShapesMutated?: (shapes: ShapeRecord[]) => void;
 	onActionRecorded?: (action: HistoryAction) => void;
 	onCursorMoved?: (pos: { x: number; y: number } | null) => void;
+	snapToGrid?: boolean;
+	snapStep?: number;
 }
 
 export class InteractionController {
@@ -276,6 +278,14 @@ export class InteractionController {
 			this.host.tool === 'sticky_note'
 		) {
 			this.interactionType = 'create_shape';
+			if (this.host.snapToGrid && !e.altKey) {
+				const step = this.host.snapStep ?? 16;
+				this.startPoint = {
+					x: Math.round(worldPos.x / step) * step,
+					y: Math.round(worldPos.y / step) * step
+				};
+				this.currentPoint = { ...this.startPoint };
+			}
 			this.host.renderOverlay();
 			return;
 		}
@@ -486,6 +496,15 @@ export class InteractionController {
 			const minW = shape.type === 'sticky_note' ? 80 : shape.type === 'text' ? 20 : 10;
 			const minH = shape.type === 'sticky_note' ? 80 : shape.type === 'text' ? 16 : 10;
 
+			let effectivePoint = worldPos;
+			if (this.host.snapToGrid && !e.altKey) {
+				const step = this.host.snapStep ?? 16;
+				effectivePoint = {
+					x: Math.round(worldPos.x / step) * step,
+					y: Math.round(worldPos.y / step) * step
+				};
+			}
+
 			const resized = calculateResizedBounds({
 				handle: this.activeResizeHandle,
 				initialBounds: {
@@ -495,7 +514,7 @@ export class InteractionController {
 					height: this.resizeInitialShape.height
 				},
 				startPoint: this.resizeInitialPointer,
-				currentPoint: worldPos,
+				currentPoint: effectivePoint,
 				maintainAspectRatio: isShift,
 				minWidth: minW,
 				minHeight: minH
@@ -580,7 +599,15 @@ export class InteractionController {
 				this.currentPoint = { x: nearest.x, y: nearest.y };
 				this.activeHoverAnchor = nearest;
 			} else {
-				this.currentPoint = worldPos;
+				if (this.host.snapToGrid && !e.altKey) {
+					const step = this.host.snapStep ?? 16;
+					this.currentPoint = {
+						x: Math.round(worldPos.x / step) * step,
+						y: Math.round(worldPos.y / step) * step
+					};
+				} else {
+					this.currentPoint = worldPos;
+				}
 				this.activeHoverAnchor = null;
 			}
 			this.host.renderOverlay();
@@ -588,6 +615,13 @@ export class InteractionController {
 		}
 
 		if (this.interactionType === 'create_shape') {
+			if (this.host.snapToGrid && !e.altKey) {
+				const step = this.host.snapStep ?? 16;
+				this.currentPoint = {
+					x: Math.round(worldPos.x / step) * step,
+					y: Math.round(worldPos.y / step) * step
+				};
+			}
 			this.host.renderOverlay();
 			return;
 		}
@@ -595,6 +629,12 @@ export class InteractionController {
 		if (this.interactionType === 'drag_selection') {
 			let dx = worldPos.x - this.startPoint.x;
 			let dy = worldPos.y - this.startPoint.y;
+
+			if (this.host.snapToGrid && !e.altKey) {
+				const step = this.host.snapStep ?? 16;
+				dx = Math.round(dx / step) * step;
+				dy = Math.round(dy / step) * step;
+			}
 
 			// If dragging 1 shape: compute smart alignment snapping and guidelines
 			if (this.dragInitialPositions.size === 1) {
