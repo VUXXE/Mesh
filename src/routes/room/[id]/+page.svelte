@@ -262,6 +262,10 @@
 		socket?.setUserName(name);
 	}
 
+	function handleUpdateUserColor(color: string) {
+		socket?.setUserColor(color);
+	}
+
 	function handleActionRecorded(action: HistoryAction) {
 		history.push(action);
 	}
@@ -367,6 +371,7 @@
 			locked={socket.authRequired}
 			{engine}
 			onUpdateUserName={handleUpdateUserName}
+			onUpdateUserColor={handleUpdateUserColor}
 		/>
 
 		<!-- Reconnecting Notification Banner -->

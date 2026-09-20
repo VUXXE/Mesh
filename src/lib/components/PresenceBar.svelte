@@ -11,6 +11,7 @@
 		locked?: boolean;
 		engine: CanvasEngine | null;
 		onUpdateUserName: (name: string) => void;
+		onUpdateUserColor?: (color: string) => void;
 	}
 
 	let {
@@ -20,8 +21,20 @@
 		peers,
 		locked = false,
 		engine,
-		onUpdateUserName
+		onUpdateUserName,
+		onUpdateUserColor
 	}: Props = $props();
+
+	const COLOR_PALETTE = [
+		'#f87171', // red
+		'#fb923c', // orange
+		'#facc15', // yellow
+		'#4ade80', // green
+		'#22d3ee', // cyan
+		'#818cf8', // indigo
+		'#c084fc', // purple
+		'#f472b6' // pink
+	];
 
 	let isLight = $state(false);
 
@@ -41,6 +54,13 @@
 	let showGridMenu = $state(false);
 	let gridMode = $state<GridMode>('dots');
 	let snapToGrid = $state(false);
+
+	function toggleGridMenu() {
+		if (!showGridMenu) {
+			showProfileMenu = false;
+		}
+		showGridMenu = !showGridMenu;
+	}
 
 	$effect(() => {
 		if (engine) {
@@ -63,12 +83,12 @@
 
 	let copiedCode = $state(false);
 	let copiedLink = $state(false);
-	let isEditingName = $state(false);
-	let nameInput = $state('');
 
-	$effect(() => {
-		nameInput = currentUser.name;
-	});
+	// Profile editing state
+	let showProfileMenu = $state(false);
+	let nameInput = $state('');
+	let selectedColor = $state('');
+	let nameInputEl: HTMLInputElement | null = $state(null);
 
 	function copyRoomCode() {
 		if (typeof window === 'undefined') return;
@@ -88,18 +108,41 @@
 		}, 2000);
 	}
 
-	function saveName() {
-		isEditingName = false;
-		if (nameInput.trim() && nameInput.trim() !== currentUser.name) {
-			onUpdateUserName(nameInput.trim());
-		}
+	function openProfileMenu() {
+		showGridMenu = false;
+		nameInput = currentUser.name;
+		selectedColor = currentUser.color;
+		showProfileMenu = true;
+		setTimeout(() => {
+			nameInputEl?.focus();
+			nameInputEl?.select();
+		}, 20);
 	}
 
-	function handleKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter') saveName();
-		if (e.key === 'Escape') {
-			nameInput = currentUser.name;
-			isEditingName = false;
+	function closeProfileMenu() {
+		showProfileMenu = false;
+		nameInput = currentUser.name;
+		selectedColor = currentUser.color;
+	}
+
+	function saveProfile() {
+		const trimmed = nameInput.trim();
+		if (trimmed && trimmed !== currentUser.name) {
+			onUpdateUserName(trimmed);
+		}
+		if (selectedColor && selectedColor !== currentUser.color) {
+			onUpdateUserColor?.(selectedColor);
+		}
+		showProfileMenu = false;
+	}
+
+	function handleProfileKeyDown(e: KeyboardEvent) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			saveProfile();
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			closeProfileMenu();
 		}
 	}
 
@@ -191,7 +234,7 @@
 	>
 		<!-- Grid Mode Button -->
 		<button
-			onclick={() => (showGridMenu = !showGridMenu)}
+			onclick={toggleGridMenu}
 			class="flex h-8 w-8 items-center justify-center rounded-md transition-colors focus:outline-none {showGridMenu ||
 			gridMode !== 'none'
 				? 'bg-(--surface-2) text-[#6366f1]'
@@ -418,7 +461,7 @@
 
 	<!-- 3. Collaboration & Presence Pill (Peers + You) -->
 	<div
-		class="flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2 shadow-lg backdrop-blur-md"
+		class="relative flex h-9 items-center gap-1.5 rounded-lg border border-(--surface-2) bg-(--surface-1) px-2 shadow-lg backdrop-blur-md"
 	>
 		<!-- Connected Peer Avatars -->
 		{#if peers.length > 0}
@@ -436,32 +479,181 @@
 			<div class="mx-0.5 h-3.5 w-px bg-(--surface-2)"></div>
 		{/if}
 
-		<!-- Local Current User Pill -->
-		<div class="flex items-center gap-1.5">
+		<!-- Local Current User Trigger Button -->
+		<button
+			onclick={openProfileMenu}
+			class="flex items-center gap-1.5 rounded-md px-1 py-0.5 transition-colors hover:bg-(--surface-2) focus:outline-none {showProfileMenu
+				? 'bg-(--surface-2)'
+				: ''}"
+			title="Click to edit your profile and cursor color"
+			aria-label="Edit your profile"
+		>
 			<div
-				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/15 text-[10px] font-bold text-black shadow-2xs dark:border-white/20"
+				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/15 text-[10px] font-bold text-black shadow-2xs transition-colors dark:border-white/20"
 				style="background-color: {currentUser.color};"
 			>
 				{getInitials(currentUser.name)}
 			</div>
 
-			{#if isEditingName}
-				<input
-					type="text"
-					bind:value={nameInput}
-					onblur={saveName}
-					onkeydown={handleKeyDown}
-					class="h-6 w-20 rounded border border-[#6366f1] bg-(--surface-2) px-1.5 text-xs text-(--ink-1) focus:outline-none"
-				/>
-			{:else}
-				<button
-					onclick={() => (isEditingName = true)}
-					class="max-w-[80px] truncate text-xs font-medium text-(--ink-1) transition-colors hover:text-[#6366f1] focus:outline-none"
-					title="Click to edit your display name"
+			<span class="max-w-[80px] truncate text-xs font-medium text-(--ink-1)">
+				{currentUser.name}
+			</span>
+
+			<svg
+				class="h-3 w-3 text-(--ink-3) transition-transform duration-150 {showProfileMenu
+					? 'rotate-180 text-(--ink-1)'
+					: ''}"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2.5"
+			>
+				<polyline points="6 9 12 15 18 9" />
+			</svg>
+		</button>
+
+		<!-- Profile Popover Dropdown -->
+		{#if showProfileMenu}
+			<button
+				type="button"
+				class="fixed inset-0 z-40 cursor-default bg-transparent focus:outline-none"
+				onclick={closeProfileMenu}
+				tabindex="-1"
+				aria-label="Close profile menu"
+			></button>
+
+			<div
+				class="absolute top-full right-0 z-50 mt-2 w-72 rounded-xl border border-(--surface-2) bg-(--surface-1) p-3.5 shadow-2xl backdrop-blur-md"
+			>
+				<!-- Popover Header -->
+				<div class="mb-3 flex items-center justify-between">
+					<div class="flex items-center gap-1.5">
+						<svg
+							class="h-4 w-4 text-[#818cf8]"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+							<circle cx="12" cy="7" r="4" />
+						</svg>
+						<span class="text-xs font-semibold text-(--ink-1)">Edit Profile</span>
+					</div>
+					<button
+						type="button"
+						onclick={closeProfileMenu}
+						class="rounded p-1 text-(--ink-3) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+						aria-label="Close"
+					>
+						<svg
+							class="h-3.5 w-3.5"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<line x1="18" y1="6" x2="6" y2="18" />
+							<line x1="6" y1="6" x2="18" y2="18" />
+						</svg>
+					</button>
+				</div>
+
+				<!-- Live Preview Card -->
+				<div
+					class="mb-3 flex items-center gap-2.5 rounded-lg border border-(--surface-2) bg-(--surface-0)/70 p-2.5"
 				>
-					{currentUser.name}
-				</button>
-			{/if}
-		</div>
+					<div
+						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 text-xs font-bold text-black shadow-xs transition-colors dark:border-white/20"
+						style="background-color: {selectedColor || currentUser.color};"
+					>
+						{getInitials(nameInput || currentUser.name)}
+					</div>
+					<div class="min-w-0 flex-1">
+						<div class="truncate text-xs font-semibold text-(--ink-1)">
+							{nameInput.trim() || currentUser.name}
+						</div>
+						<div class="flex items-center gap-1.5 text-[10px] text-(--ink-3)">
+							<span
+								class="h-1.5 w-1.5 rounded-full"
+								style="background-color: {selectedColor || currentUser.color};"
+							></span>
+							<span>Live cursor & presence</span>
+						</div>
+					</div>
+				</div>
+
+				<!-- Name Input -->
+				<div class="mb-3 space-y-1">
+					<label for="profile-name-input" class="block text-[11px] font-medium text-(--ink-2)">
+						Display Name
+					</label>
+					<input
+						id="profile-name-input"
+						type="text"
+						bind:this={nameInputEl}
+						bind:value={nameInput}
+						onkeydown={handleProfileKeyDown}
+						maxlength={32}
+						placeholder="Enter your name"
+						class="w-full rounded-lg border border-(--surface-2) bg-(--surface-0) px-2.5 py-1.5 text-xs text-(--ink-1) placeholder-(--ink-3) transition-colors focus:border-[#6366f1] focus:ring-1 focus:ring-[#6366f1] focus:outline-none"
+					/>
+				</div>
+
+				<!-- Color Palette Picker -->
+				<div class="mb-4 space-y-1.5">
+					<span class="block text-[11px] font-medium text-(--ink-2)"> Presence Color </span>
+					<div class="grid grid-cols-8 gap-1.5">
+						{#each COLOR_PALETTE as color}
+							<button
+								type="button"
+								onclick={() => (selectedColor = color)}
+								class="relative flex h-6 w-6 items-center justify-center rounded-full border border-black/15 transition-transform hover:scale-110 focus:outline-none dark:border-white/20 {selectedColor ===
+								color
+									? 'scale-110 ring-2 ring-[#6366f1] ring-offset-1 ring-offset-(--surface-1)'
+									: 'hover:opacity-90'}"
+								style="background-color: {color};"
+								title="Choose color"
+								aria-label="Color {color}"
+							>
+								{#if selectedColor === color}
+									<svg
+										class="h-3 w-3 text-black"
+										viewBox="0 0 24 24"
+										fill="none"
+										stroke="currentColor"
+										stroke-width="3"
+									>
+										<polyline points="20 6 9 17 4 12" />
+									</svg>
+								{/if}
+							</button>
+						{/each}
+					</div>
+				</div>
+
+				<!-- Actions -->
+				<div class="flex items-center justify-between border-t border-(--surface-2) pt-2.5">
+					<span class="text-[10px] text-(--ink-3)">Press ↵ Enter</span>
+					<div class="flex items-center gap-1.5">
+						<button
+							type="button"
+							onclick={closeProfileMenu}
+							class="rounded-md px-2.5 py-1 text-xs font-medium text-(--ink-2) transition-colors hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none"
+						>
+							Cancel
+						</button>
+						<button
+							type="button"
+							onclick={saveProfile}
+							disabled={!nameInput.trim()}
+							class="rounded-md bg-[#6366f1] px-3 py-1 text-xs font-medium text-white shadow-xs transition-colors hover:bg-[#4f46e5] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+						>
+							Save
+						</button>
+					</div>
+				</div>
+			</div>
+		{/if}
 	</div>
 </div>
