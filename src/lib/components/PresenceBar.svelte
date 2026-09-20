@@ -582,7 +582,7 @@
 			aria-label="Edit your profile"
 		>
 			<div
-				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/15 text-[10px] font-bold text-black shadow-2xs transition-colors dark:border-white/20"
+				class="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-black/35 text-[10px] font-bold text-black shadow-2xs transition-colors dark:border-white/25"
 				style="background-color: {currentUser.color};"
 			>
 				{getInitials(currentUser.name)}
@@ -657,7 +657,7 @@
 					class="mb-3 flex items-center gap-2.5 rounded-lg border border-(--surface-2) bg-(--surface-0)/70 p-2.5"
 				>
 					<div
-						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/15 text-xs font-bold text-black shadow-xs transition-colors dark:border-white/20"
+						class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-black/35 text-xs font-bold text-black shadow-xs transition-colors dark:border-white/25"
 						style="background-color: {selectedColor || currentUser.color};"
 					>
 						{getInitials(nameInput || currentUser.name)}
@@ -701,7 +701,7 @@
 							<button
 								type="button"
 								onclick={() => (selectedColor = color)}
-								class="relative flex h-6 w-6 items-center justify-center rounded-full border border-black/15 transition-transform hover:scale-110 focus:outline-none dark:border-white/20 {selectedColor ===
+								class="relative flex h-6 w-6 items-center justify-center rounded-full border border-black/35 transition-transform hover:scale-110 focus:outline-none dark:border-white/25 {selectedColor ===
 								color
 									? 'scale-110 ring-2 ring-[#6366f1] ring-offset-1 ring-offset-(--surface-1)'
 									: 'hover:opacity-90'}"

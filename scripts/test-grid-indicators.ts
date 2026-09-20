@@ -31,7 +31,10 @@ if (!code.includes("{snapToGrid ? 'ON' : 'OFF'}")) {
 console.log('✅ PASS: Snap to Grid toggle displays explicit ON / OFF text badge');
 
 // 5. Check for real-time Grid HUD notification
-if (!code.includes('gridHudMessage') || !code.includes('Floating Real-Time Grid HUD Notification')) {
+if (
+	!code.includes('gridHudMessage') ||
+	!code.includes('Floating Real-Time Grid HUD Notification')
+) {
 	throw new Error('FAIL: Grid HUD toast notification missing');
 }
 console.log('✅ PASS: Real-time Floating Grid HUD toast notification implemented');
