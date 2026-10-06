@@ -16,6 +16,7 @@
 		onRedo?: () => void;
 		onClearCanvas: () => void;
 		onOpenMermaid?: () => void;
+		onOpenShortcuts?: () => void;
 	}
 
 	let {
@@ -26,7 +27,8 @@
 		onUndo,
 		onRedo,
 		onClearCanvas,
-		onOpenMermaid
+		onOpenMermaid,
+		onOpenShortcuts
 	}: Props = $props();
 
 	let activeTool = $state<ToolMode>('select');
@@ -412,6 +414,7 @@
 	onExportSvg={handleExportSvg}
 	onExportJson={handleExportJson}
 	{onOpenMermaid}
+	{onOpenShortcuts}
 	onTriggerImport={triggerImport}
 />
 

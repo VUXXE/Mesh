@@ -905,6 +905,32 @@ export class CanvasEngine implements InteractionHost {
 		this.interactions.handleWheel(e);
 	}
 
+	zoomBy(
+		factor: number,
+		centerX = typeof window !== 'undefined' ? window.innerWidth / 2 : 400,
+		centerY = typeof window !== 'undefined' ? window.innerHeight / 2 : 300
+	) {
+		const newZoom = Math.min(Math.max(this.viewport.zoom * factor, 0.1), 5.0);
+		if (newZoom !== this.viewport.zoom) {
+			this.viewport.panX =
+				centerX - (centerX - this.viewport.panX) * (newZoom / this.viewport.zoom);
+			this.viewport.panY =
+				centerY - (centerY - this.viewport.panY) * (newZoom / this.viewport.zoom);
+			this.viewport.zoom = newZoom;
+			this.emitViewportChanged();
+			this.renderBuffer();
+			this.renderOverlay();
+		}
+	}
+
+	zoomIn() {
+		this.zoomBy(1.2);
+	}
+
+	zoomOut() {
+		this.zoomBy(1 / 1.2);
+	}
+
 	resetZoom() {
 		this.viewport.zoom = 1;
 		this.viewport.panX = 0;
@@ -912,6 +938,67 @@ export class CanvasEngine implements InteractionHost {
 		this.emitViewportChanged();
 		this.renderBuffer();
 		this.renderOverlay();
+	}
+
+	nudgeSelected(dx: number, dy: number) {
+		if (this.selectedIds.length === 0 || (dx === 0 && dy === 0)) return;
+
+		const beforeShapes: ShapeRecord[] = [];
+		const afterShapes: ShapeRecord[] = [];
+
+		for (const id of this.selectedIds) {
+			const shape = this.shapes.get(id);
+			if (!shape) continue;
+
+			// Deep clone before state for history
+			beforeShapes.push({
+				...shape,
+				data: shape.data
+					? {
+							...shape.data,
+							points: shape.data.points
+								? shape.data.points.map((p: PathPoint) => ({ ...p }))
+								: undefined
+						}
+					: undefined
+			});
+
+			// Mutate shape
+			shape.x += dx;
+			shape.y += dy;
+			shape.updatedAt = Date.now();
+			if (shape.type === 'path' && shape.data?.points) {
+				shape.data.points = shape.data.points.map((p: PathPoint) => ({
+					...p,
+					x: p.x + dx,
+					y: p.y + dy
+				}));
+			}
+
+			// Deep clone after state
+			afterShapes.push({
+				...shape,
+				data: shape.data
+					? {
+							...shape.data,
+							points: shape.data.points
+								? shape.data.points.map((p: PathPoint) => ({ ...p }))
+								: undefined
+						}
+					: undefined
+			});
+		}
+
+		if (afterShapes.length === 0) return;
+
+		this.renderBuffer();
+		this.renderOverlay();
+		this.onShapesMutated?.(afterShapes);
+		this.onActionRecorded?.({
+			type: 'modify',
+			before: beforeShapes,
+			after: afterShapes
+		});
 	}
 
 	deleteSelected() {

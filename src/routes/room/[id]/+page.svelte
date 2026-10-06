@@ -3,6 +3,7 @@
 	import { page } from '$app/state';
 	import Canvas from '$lib/components/Canvas.svelte';
 	import MermaidModal from '$lib/components/MermaidModal.svelte';
+	import ShortcutsModal from '$lib/components/ShortcutsModal.svelte';
 	import MiniMap from '$lib/components/MiniMap.svelte';
 	import PresenceBar from '$lib/components/PresenceBar.svelte';
 	import Toolbar from '$lib/components/Toolbar.svelte';
@@ -21,6 +22,7 @@
 	let authPassword = $state('');
 	let passwordClaimed = false;
 	let isMermaidModalOpen = $state(false);
+	let isShortcutsModalOpen = $state(false);
 	const history = new HistoryManager();
 
 	function getViewportCenter(): { x: number; y: number } {
@@ -48,8 +50,59 @@
 				return;
 			}
 
+			if (isShortcutsModalOpen) {
+				if (e.key === 'Escape') {
+					e.preventDefault();
+					isShortcutsModalOpen = false;
+				}
+				return;
+			}
+
 			const isMod = e.ctrlKey || e.metaKey;
 
+			if (isMod && (e.key === 's' || e.key === 'S')) {
+				e.preventDefault();
+				return;
+			}
+
+			if (isMod && (e.key === '=' || e.key === '+')) {
+				e.preventDefault();
+				engine?.zoomIn();
+				return;
+			}
+
+			if (isMod && (e.key === '-' || e.key === '_')) {
+				e.preventDefault();
+				engine?.zoomOut();
+				return;
+			}
+
+			if (isMod && e.key === '0') {
+				e.preventDefault();
+				engine?.resetZoom();
+				return;
+			}
+
+			if (e.key === '?' || (isMod && e.key === '/')) {
+				e.preventDefault();
+				isShortcutsModalOpen = !isShortcutsModalOpen;
+				return;
+			}
+
+			if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+				if (selectedIds.length > 0) {
+					e.preventDefault();
+					const step = e.shiftKey ? 10 : 1;
+					let dx = 0;
+					let dy = 0;
+					if (e.key === 'ArrowUp') dy = -step;
+					if (e.key === 'ArrowDown') dy = step;
+					if (e.key === 'ArrowLeft') dx = -step;
+					if (e.key === 'ArrowRight') dx = step;
+					engine?.nudgeSelected(dx, dy);
+					return;
+				}
+			}
 			if (isMod && (e.key === 'z' || e.key === 'Z')) {
 				e.preventDefault();
 				if (e.shiftKey) {
@@ -138,7 +191,30 @@
 					engine?.sendBackward();
 					return;
 				}
-				if (e.key === 'v' || e.key === 'V') {
+
+				if (e.key === '1') {
+					engine?.setTool('select');
+				} else if (e.key === '2') {
+					engine?.setTool('rectangle');
+				} else if (e.key === '3') {
+					engine?.setTool('diamond');
+				} else if (e.key === '4') {
+					engine?.setTool('ellipse');
+				} else if (e.key === '5') {
+					engine?.setTool('arrow');
+				} else if (e.key === '6') {
+					engine?.setTool('line');
+				} else if (e.key === '7') {
+					engine?.setTool('pen');
+				} else if (e.key === '8') {
+					engine?.setTool('text');
+				} else if (e.key === '9') {
+					engine?.setTool('sticky_note');
+				} else if (e.key === '0') {
+					engine?.setTool('pan');
+				} else if (e.key === 'h' || e.key === 'H') {
+					engine?.setTool('pan');
+				} else if (e.key === 'v' || e.key === 'V') {
 					engine?.setTool('select');
 				} else if (e.key === 'p' || e.key === 'P') {
 					engine?.setTool('pen');
@@ -161,7 +237,12 @@
 				} else if (e.key === 'Delete' || e.key === 'Backspace') {
 					engine?.deleteSelected();
 				} else if (e.key === 'Escape') {
-					engine?.setTool('select');
+					if (selectedIds.length > 0) {
+						engine?.setSelectedIds([]);
+						engine?.renderOverlay();
+					} else {
+						engine?.setTool('select');
+					}
 				} else if (e.key === 'Enter') {
 					if (selectedIds.length === 1) {
 						const shape = engine?.getShape(selectedIds[0]);
@@ -406,6 +487,7 @@
 			onRedo={handleRedo}
 			onClearCanvas={handleClearCanvas}
 			onOpenMermaid={() => (isMermaidModalOpen = true)}
+			onOpenShortcuts={() => (isShortcutsModalOpen = true)}
 		/>
 
 		<!-- Bottom-Right Radar Minimap -->
@@ -421,6 +503,9 @@
 			viewportCenter={getViewportCenter()}
 			startZIndex={engine?.getNextZIndex() ?? 1}
 		/>
+
+		<!-- Keyboard Shortcuts Modal -->
+		<ShortcutsModal isOpen={isShortcutsModalOpen} onClose={() => (isShortcutsModalOpen = false)} />
 
 		<!-- Password Gate -->
 		{#if socket.authRequired && !socket.authed}
