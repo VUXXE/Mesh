@@ -23,6 +23,7 @@
 		onExportSvg: () => void;
 		onExportJson: () => void;
 		onOpenMermaid?: () => void;
+		onOpenShortcuts?: () => void;
 		onTriggerImport: () => void;
 	}
 
@@ -46,6 +47,7 @@
 		onExportSvg,
 		onExportJson,
 		onOpenMermaid,
+		onOpenShortcuts,
 		onTriggerImport
 	}: Props = $props();
 </script>
@@ -295,6 +297,29 @@
 
 	<div class="mx-0.5 h-5 w-px shrink-0 bg-(--surface-2)"></div>
 
+	<!-- Keyboard Shortcuts Button -->
+	<div class="group relative shrink-0">
+		<button
+			onclick={onOpenShortcuts}
+			class="flex h-9 items-center gap-1.5 rounded-xl px-2 text-xs font-medium text-(--ink-2) transition-[background-color,color,transform] duration-100 ease-out hover:bg-(--surface-2) hover:text-(--ink-1) focus:outline-none focus-visible:ring-2 focus-visible:ring-[#6366f1] active:scale-95"
+			title="Keyboard Shortcuts (?)"
+			aria-label="Keyboard Shortcuts"
+		>
+			<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+				<circle cx="12" cy="12" r="10" />
+				<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+				<line x1="12" y1="17" x2="12.01" y2="17" />
+			</svg>
+		</button>
+		<span
+			class="pointer-events-none absolute -top-9 left-1/2 z-30 flex -translate-x-1/2 scale-95 items-center gap-1.5 rounded-md border border-(--surface-2) bg-(--surface-1) px-2 py-1 text-[11px] font-medium whitespace-nowrap text-(--ink-1) opacity-0 shadow-lg backdrop-blur-md transition-all duration-150 ease-out group-hover:scale-100 group-hover:opacity-100"
+		>
+			<span>Shortcuts</span>
+			<kbd class="py-0.2 rounded bg-(--surface-2) px-1 font-mono text-[9px] text-(--ink-2)">?</kbd>
+		</span>
+	</div>
+
+	<div class="mx-0.5 h-5 w-px shrink-0 bg-(--surface-2)"></div>
 	<!-- Export / Import Menu Popover Trigger -->
 	<div class="relative shrink-0">
 		<button
