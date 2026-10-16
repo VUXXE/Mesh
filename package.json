@@ -18,14 +18,17 @@
 		"format": "prettier --write .",
 		"docker:build": "docker build -t mesh .",
 		"docker:up": "docker compose up -d",
-		"docker:down": "docker compose down"
+		"docker:down": "docker compose down",
+		"test:e2e": "e2e run"
 	},
 	"devDependencies": {
+		"@e2e-dev/web": "^0.15.1",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
 		"@sveltejs/kit": "^2.63.0",
 		"@sveltejs/vite-plugin-svelte": "^7.1.2",
 		"@tailwindcss/vite": "^4.3.0",
 		"@types/node": "^26.5.1",
+		"e2e": "^0.21.1",
 		"prettier": "^3.8.3",
 		"prettier-plugin-svelte": "^4.1.0",
 		"prettier-plugin-tailwindcss": "^0.8.0",
