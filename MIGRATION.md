@@ -36,6 +36,7 @@ Defect check: off
 | scripts/test-grid-mode.ts            | tests/diagram-and-styling.e2e.ts      | ported | 3 → 9                     | web 3/3 | off          | Light/dark mode grid dots contrast, lines mode & swatches                                 |
 | scripts/test-profile-editing.ts      | tests/diagram-and-styling.e2e.ts      | ported | 4 → 12                    | web 3/3 | off          | 8-color presence palette, avatar preview & user profile                                   |
 | scripts/test-keyboard-shortcuts.ts   | tests/editing-and-interactions.e2e.ts | ported | 6 → 21                    | web 3/3 | off          | Shortcuts catalog, zoom/pan clamping, nudge & modal UI                                    |
+| agent journey (AI agent)             | tests/agent-journey.e2e.ts            | ported | 4 goals → 5 assertions    | web 3/3 | off          | AI Agent (`agent.act`) on local OmniRoute with `antigravity/gemini-3.5-flash-lite`        |
 
 ## Shared helpers
 

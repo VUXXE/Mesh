@@ -11,9 +11,10 @@ if (typeof (globalThis as any).$state === 'undefined') {
 	(globalThis as any).$state = (init: any) => init;
 }
 if (typeof (globalThis as any).window === 'undefined') {
-	(globalThis as any).window = {
-		location: { protocol: 'http:', host: '127.0.0.1:4173' }
-	};
+	(globalThis as any).window = {};
+}
+if (!(globalThis as any).window.location) {
+	(globalThis as any).window.location = { protocol: 'http:', host: '127.0.0.1:4173' };
 }
 if (typeof (globalThis as any).sessionStorage === 'undefined') {
 	const memStorage: Record<string, string> = {};
@@ -467,6 +468,12 @@ test('Free-Tier Presence Quota & Cursor Suppression Logic', async () => {
 	(globalThis as any).WebSocket = MockPresenceWebSocket;
 
 	try {
+		if (typeof (globalThis as any).window === 'undefined') {
+			(globalThis as any).window = {};
+		}
+		if (!(globalThis as any).window.location) {
+			(globalThis as any).window.location = { protocol: 'http:', host: '127.0.0.1:4173' };
+		}
 		const socket = new RoomSocket('test-room-quota');
 		const mockWs = MockPresenceWebSocket.instances[MockPresenceWebSocket.instances.length - 1];
 		mockWs.onopen?.();
